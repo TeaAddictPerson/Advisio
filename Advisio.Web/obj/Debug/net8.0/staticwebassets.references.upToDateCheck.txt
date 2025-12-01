@@ -1,0 +1,1 @@
+D:\CodingStuff\Advisio\Advisio.API\obj\Debug\net8.0\staticwebassets.build.json

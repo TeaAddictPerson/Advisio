@@ -1,0 +1,6 @@
+@Advisio.API_HostAddress = http://localhost:5170
+
+GET {{Advisio.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

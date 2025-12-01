@@ -1,0 +1,122 @@
+@page "/Place/{id}"
+@model Advisio.Web.Pages.PlaceModel
+@{
+    ViewData["Title"] = "Место";
+}
+
+<div class="container mt-4" id="placeContainer">
+    <!-- Детали места будут загружены через JavaScript -->
+</div>
+
+@section Scripts {
+    <script>
+        let userId = 1;
+        const placeId = @Model.Id;
+
+        async function loadPlace() {
+            try {
+                const response = await fetch(`/api/places/${placeId}?userId=${userId}`);
+                if (response.status === 404) {
+                    document.getElementById('placeContainer').innerHTML = 
+                        '<div class="alert alert-warning">Место не найдено</div>';
+                    return;
+                }
+                const place = await response.json();
+                displayPlace(place);
+            } catch (error) {
+                console.error('Ошибка загрузки места:', error);
+            }
+        }
+
+        function displayPlace(place) {
+            const container = document.getElementById('placeContainer');
+            container.innerHTML = `
+                <div class="row">
+                    <div class="col-md-12">
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb">
+                                <li class="breadcrumb-item"><a href="/Places">Места отдыха</a></li>
+                                <li class="breadcrumb-item active" aria-current="page">${place.name}</li>
+                            </ol>
+                        </nav>
+                    </div>
+                </div>
+                <div class="card shadow-sm mb-4">
+                    ${place.imageUrl ? `<img src="${place.imageUrl}" class="card-img-top" alt="${place.name}" style="max-height: 400px; object-fit: cover;">` : '<div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 300px;"><i class="bi bi-image" style="font-size: 4rem; color: #ccc;"></i></div>'}
+                    <div class="card-body">
+                        <h1 class="card-title mb-3">${place.name}</h1>
+                        <div class="mb-3">
+                            ${place.categories.map(cat => `<span class="badge bg-primary me-2 mb-2" style="font-size: 0.9rem;">${cat}</span>`).join('')}
+                        </div>
+                        <div class="mb-4">
+                            <h5 class="mb-3">Описание</h5>
+                            <p class="card-text" style="line-height: 1.8; font-size: 1.1rem; white-space: pre-wrap;">${place.description}</p>
+                        </div>
+                        <div class="row mb-4">
+                            ${place.address ? `
+                                <div class="col-md-6 mb-3">
+                                    <h6><i class="bi bi-geo-alt-fill"></i> Адрес</h6>
+                                    <p class="mb-0">${place.address}</p>
+                                </div>
+                            ` : ''}
+                            ${place.latitude && place.longitude ? `
+                                <div class="col-md-6 mb-3">
+                                    <h6><i class="bi bi-geo-alt"></i> Расположение</h6>
+                                    <p class="mb-2">Координаты: ${place.latitude}, ${place.longitude}</p>
+                                    <a href="https://www.google.com/maps?q=${place.latitude},${place.longitude}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-map"></i> Открыть на карте
+                                    </a>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap">
+                            <div class="mb-2">
+                                <span class="badge bg-info fs-6">
+                                    <i class="bi bi-heart-fill"></i> ${place.likesCount} лайков
+                                </span>
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button class="btn ${place.isFavorite ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleFavorite(${place.id})">
+                                    <i class="bi ${place.isFavorite ? 'bi-star-fill' : 'bi-star'}"></i> ${place.isFavorite ? 'В избранном' : 'В избранное'}
+                                </button>
+                                <button class="btn ${place.isLiked ? 'btn-danger' : 'btn-outline-danger'}" onclick="toggleLike(${place.id})">
+                                    <i class="bi ${place.isLiked ? 'bi-heart-fill' : 'bi-heart'}"></i> ${place.isLiked ? 'Лайкнуто' : 'Лайкнуть'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function toggleFavorite(placeId) {
+            try {
+                const response = await fetch(`/api/places/${placeId}/favorites?userId=${userId}`, {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    loadPlace();
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+            }
+        }
+
+        async function toggleLike(placeId) {
+            try {
+                const response = await fetch(`/api/places/${placeId}/likes?userId=${userId}`, {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    loadPlace();
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+            }
+        }
+
+        loadPlace();
+    </script>
+}
+

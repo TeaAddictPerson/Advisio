@@ -1,0 +1,133 @@
+@page
+@model Advisio.Web.Pages.SurveyModel
+@{
+    ViewData["Title"] = "Опрос";
+}
+
+<div class="container mt-4">
+    <h1 class="mb-4">Опрос о предпочтениях отдыха</h1>
+    
+    <div id="surveyContainer">
+        <!-- Опрос будет загружен через JavaScript -->
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let userId = 1; // Временный ID пользователя
+        let surveyData = null;
+
+        async function loadSurvey() {
+            try {
+                const response = await fetch('/api/survey/active');
+                if (response.status === 404) {
+                    document.getElementById('surveyContainer').innerHTML = 
+                        '<div class="alert alert-warning">Активный опрос не найден</div>';
+                    return;
+                }
+                surveyData = await response.json();
+                displaySurvey(surveyData);
+            } catch (error) {
+                console.error('Ошибка загрузки опроса:', error);
+            }
+        }
+
+        function displaySurvey(survey) {
+            const container = document.getElementById('surveyContainer');
+            let html = `
+                <div class="card">
+                    <div class="card-header">
+                        <h3>${survey.title}</h3>
+                        <p>${survey.description}</p>
+                    </div>
+                    <div class="card-body">
+                        <form id="surveyForm">
+            `;
+
+            survey.questions.forEach((question, qIndex) => {
+                html += `
+                    <div class="mb-4">
+                        <h5>${qIndex + 1}. ${question.questionText}</h5>
+                        <div class="form-group">
+                `;
+                question.answers.forEach(answer => {
+                    html += `
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="question_${question.id}" 
+                                   id="answer_${answer.id}" value="${answer.id}" required>
+                            <label class="form-check-label" for="answer_${answer.id}">
+                                ${answer.answerText}
+                            </label>
+                        </div>
+                    `;
+                });
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                            <button type="submit" class="btn btn-primary btn-lg">Отправить ответы</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+
+            document.getElementById('surveyForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await submitSurvey();
+            });
+        }
+
+        async function submitSurvey() {
+            const form = document.getElementById('surveyForm');
+            const formData = new FormData(form);
+            
+            const responses = [];
+            surveyData.questions.forEach(question => {
+                const answerId = formData.get(`question_${question.id}`);
+                if (answerId) {
+                    responses.push({
+                        questionId: question.id,
+                        answerId: parseInt(answerId)
+                    });
+                }
+            });
+
+            if (responses.length !== surveyData.questions.length) {
+                alert('Пожалуйста, ответьте на все вопросы');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/survey/submit?userId=${userId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        surveyId: surveyData.id,
+                        responses: responses
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Опрос успешно отправлен! Теперь вы можете получить персональные рекомендации.');
+                    window.location.href = '/Recommendations';
+                } else {
+                    const error = await response.json();
+                    alert('Ошибка: ' + (error.error || 'Не удалось отправить опрос'));
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Произошла ошибка при отправке опроса');
+            }
+        }
+
+        loadSurvey();
+    </script>
+}
+

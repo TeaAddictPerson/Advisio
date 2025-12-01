@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\Advisio.Web.props" />
+</Project>

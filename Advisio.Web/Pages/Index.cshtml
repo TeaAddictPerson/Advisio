@@ -1,0 +1,57 @@
+﻿@page
+@model Advisio.Web.Pages.IndexModel
+@{
+    ViewData["Title"] = "Главная";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="display-4 mb-4">Advisio - Система рекомендаций мест отдыха</h1>
+            <p class="lead">Найдите идеальное место для отдыха с друзьями, семьей или детьми</p>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Места отдыха</h5>
+                    <p class="card-text">Просмотрите все доступные места для отдыха</p>
+                    <a href="/Places" class="btn btn-primary">Перейти к местам</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Рекомендации</h5>
+                    <p class="card-text">Получите персональные рекомендации на основе ваших предпочтений</p>
+                    <a href="/Recommendations" class="btn btn-success">Мои рекомендации</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Опрос</h5>
+                    <p class="card-text">Пройдите опрос для улучшения рекомендаций</p>
+                    <a href="/Survey" class="btn btn-info">Пройти опрос</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h5>Как это работает?</h5>
+                <ul>
+                    <li>Для новых пользователей система предлагает несколько мест из каждой категории</li>
+                    <li>После прохождения опроса рекомендации становятся более точными</li>
+                    <li>Система учитывает ваши предпочтения и исключает уже просмотренные места</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

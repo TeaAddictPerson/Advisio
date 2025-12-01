@@ -1,0 +1,113 @@
+@page
+@model Advisio.Web.Pages.RecommendationsModel
+@{
+    ViewData["Title"] = "Рекомендации";
+}
+
+<div class="container mt-4">
+    <h1 class="mb-4">Персональные рекомендации</h1>
+    
+    <div id="recommendationsContainer" class="row">
+        <!-- Рекомендации будут загружены через JavaScript -->
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let userId = 1; // Временный ID пользователя
+        
+        async function loadRecommendations() {
+            try {
+                const response = await fetch(`/api/recommendations?userId=${userId}&count=20`);
+                const recommendations = await response.json();
+                displayRecommendations(recommendations);
+            } catch (error) {
+                console.error('Ошибка загрузки рекомендаций:', error);
+                document.getElementById('recommendationsContainer').innerHTML = 
+                    '<div class="col-12"><div class="alert alert-info">Рекомендации не найдены. Пройдите опрос для получения персональных рекомендаций.</div></div>';
+            }
+        }
+
+        function displayRecommendations(recommendations) {
+            const container = document.getElementById('recommendationsContainer');
+            container.innerHTML = '';
+
+            if (recommendations.length === 0) {
+                container.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <h5>Рекомендации не найдены</h5>
+                            <p>Пройдите опрос для получения персональных рекомендаций.</p>
+                            <a href="/Survey" class="btn btn-primary">Пройти опрос</a>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            recommendations.forEach(rec => {
+                const place = rec.place;
+                const card = `
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100 border-success">
+                            <div class="card-header bg-success text-white">
+                                <small>Оценка: ${rec.score.toFixed(1)}</small>
+                            </div>
+                            ${place.imageUrl ? `<img src="${place.imageUrl}" class="card-img-top" alt="${place.name}" style="height: 200px; object-fit: cover;">` : ''}
+                            <div class="card-body">
+                                <h5 class="card-title">${place.name}</h5>
+                                <p class="card-text">${place.description.substring(0, 100)}${place.description.length > 100 ? '...' : ''}</p>
+                                ${rec.reason ? `<p class="text-muted small"><em>${rec.reason}</em></p>` : ''}
+                                <div class="mb-2">
+                                    ${place.categories.map(cat => `<span class="badge bg-secondary me-1">${cat}</span>`).join('')}
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">${place.likesCount} лайков</small>
+                                    <div>
+                                        <button class="btn btn-sm ${place.isFavorite ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleFavorite(${place.id})">
+                                            ${place.isFavorite ? '★' : '☆'}
+                                        </button>
+                                        <button class="btn btn-sm ${place.isLiked ? 'btn-danger' : 'btn-outline-danger'}" onclick="toggleLike(${place.id})">
+                                            ${place.isLiked ? '❤️' : '🤍'}
+                                        </button>
+                                    </div>
+                                </div>
+                                <a href="/Place/${place.id}" class="btn btn-primary btn-sm mt-2">Подробнее</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += card;
+            });
+        }
+
+        async function toggleFavorite(placeId) {
+            try {
+                const response = await fetch(`/api/places/${placeId}/favorites?userId=${userId}`, {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    loadRecommendations();
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+            }
+        }
+
+        async function toggleLike(placeId) {
+            try {
+                const response = await fetch(`/api/places/${placeId}/likes?userId=${userId}`, {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    loadRecommendations();
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+            }
+        }
+
+        loadRecommendations();
+    </script>
+}
+

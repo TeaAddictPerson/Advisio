@@ -1,0 +1,109 @@
+@page
+@model Advisio.Web.Pages.PlacesModel
+@{
+    ViewData["Title"] = "Места отдыха";
+}
+
+<div class="container mt-4">
+    <h1 class="mb-4">Места отдыха</h1>
+    
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <input type="text" id="searchInput" class="form-control" placeholder="Поиск мест...">
+        </div>
+        <div class="col-md-6">
+            <select id="categoryFilter" class="form-select">
+                <option value="">Все категории</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="placesContainer" class="row">
+        <!-- Места будут загружены через JavaScript -->
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let userId = 1; // Временный ID пользователя, позже можно добавить аутентификацию
+        
+        async function loadPlaces() {
+            try {
+                const response = await fetch(`/api/places?userId=${userId}`);
+                const places = await response.json();
+                displayPlaces(places);
+            } catch (error) {
+                console.error('Ошибка загрузки мест:', error);
+            }
+        }
+
+        function displayPlaces(places) {
+            const container = document.getElementById('placesContainer');
+            container.innerHTML = '';
+
+            if (places.length === 0) {
+                container.innerHTML = '<div class="col-12"><p class="text-muted">Места не найдены</p></div>';
+                return;
+            }
+
+            places.forEach(place => {
+                const card = `
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            ${place.imageUrl ? `<img src="${place.imageUrl}" class="card-img-top" alt="${place.name}" style="height: 200px; object-fit: cover;">` : ''}
+                            <div class="card-body">
+                                <h5 class="card-title">${place.name}</h5>
+                                <p class="card-text">${place.description.substring(0, 100)}${place.description.length > 100 ? '...' : ''}</p>
+                                <div class="mb-2">
+                                    ${place.categories.map(cat => `<span class="badge bg-secondary me-1">${cat}</span>`).join('')}
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">${place.likesCount} лайков</small>
+                                    <div>
+                                        <button class="btn btn-sm ${place.isFavorite ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleFavorite(${place.id})">
+                                            ${place.isFavorite ? '★' : '☆'}
+                                        </button>
+                                        <button class="btn btn-sm ${place.isLiked ? 'btn-danger' : 'btn-outline-danger'}" onclick="toggleLike(${place.id})">
+                                            ${place.isLiked ? '❤️' : '🤍'}
+                                        </button>
+                                    </div>
+                                </div>
+                                <a href="/Place/${place.id}" class="btn btn-primary btn-sm mt-2">Подробнее</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += card;
+            });
+        }
+
+        async function toggleFavorite(placeId) {
+            try {
+                const response = await fetch(`/api/places/${placeId}/favorites?userId=${userId}`, {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    loadPlaces();
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+            }
+        }
+
+        async function toggleLike(placeId) {
+            try {
+                const response = await fetch(`/api/places/${placeId}/likes?userId=${userId}`, {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    loadPlaces();
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+            }
+        }
+
+        loadPlaces();
+    </script>
+}
+

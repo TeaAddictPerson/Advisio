@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Advisio.API", "Advisio.API\Advisio.API.csproj", "{CFD831DE-161C-43CD-83CC-335BF367A5E3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Advisio.Web", "Advisio.Web\Advisio.Web.csproj", "{EF98D00F-53AA-4E7E-97C3-22C18F2CC4C0}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CFD831DE-161C-43CD-83CC-335BF367A5E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CFD831DE-161C-43CD-83CC-335BF367A5E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CFD831DE-161C-43CD-83CC-335BF367A5E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CFD831DE-161C-43CD-83CC-335BF367A5E3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF98D00F-53AA-4E7E-97C3-22C18F2CC4C0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF98D00F-53AA-4E7E-97C3-22C18F2CC4C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF98D00F-53AA-4E7E-97C3-22C18F2CC4C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF98D00F-53AA-4E7E-97C3-22C18F2CC4C0}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
