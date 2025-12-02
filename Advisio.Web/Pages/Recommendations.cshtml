@@ -35,7 +35,7 @@
                 return;
             }
             try {
-                const response = await fetch(`/api/recommendations?userId=${userId}&count=20`);
+                const response = await fetch(`/api/recommendations?userId=${userId}&count=9`);
                 const recommendations = await response.json();
                 displayRecommendations(recommendations);
             } catch (error) {

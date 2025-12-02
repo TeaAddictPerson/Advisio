@@ -35,8 +35,20 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
     {
         _logger.LogInformation("Сервис синхронизации мест запущен. Интервал: {Interval}", _syncInterval);
 
-        // Ждем 30 секунд перед первой синхронизацией (чтобы приложение успело запуститься)
-        await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+        // Сразу запускаем первую синхронизацию при старте
+        try
+        {
+            _logger.LogInformation("Запуск первоначальной синхронизации мест...");
+            await SyncPlacesAsync();
+            _logger.LogInformation("Первоначальная синхронизация завершена успешно");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при первоначальной синхронизации");
+        }
+
+        // Ждем перед следующей синхронизацией
+        await Task.Delay(_syncInterval, stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -83,8 +95,23 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при загрузке мест из Kvitki.by");
+            _logger.LogWarning(ex, "Не удалось загрузить места из Kvitki.by. Продолжаем работу с другими источниками.");
             // Продолжаем выполнение даже если один источник не работает
+            // Это нормально, так как Kvitki API может быть недоступен или изменился
+        }
+
+        try
+        {
+            // Присваиваем категории местам без категорий
+            _logger.LogInformation("Присвоение категорий местам без категорий...");
+            var placeService = scope.ServiceProvider.GetRequiredService<IPlaceService>();
+            await placeService.AssignCategoriesToPlacesWithoutCategoriesAsync();
+            _logger.LogInformation("Категории присвоены успешно");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при присвоении категорий");
+            // Продолжаем выполнение даже если присвоение категорий не удалось
         }
     }
 }

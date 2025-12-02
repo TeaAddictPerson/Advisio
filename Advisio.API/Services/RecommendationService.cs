@@ -21,7 +21,7 @@ public class RecommendationService : IRecommendationService
         _surveyService = surveyService;
     }
 
-    public async Task<List<RecommendationDto>> GetRecommendationsAsync(int userId, int count = 10)
+    public async Task<List<RecommendationDto>> GetRecommendationsAsync(int userId, int count = 9)
     {
         // Проверяем, есть ли рекомендации для пользователя
         var existingRecommendations = await _context.Recommendations
@@ -175,10 +175,10 @@ public class RecommendationService : IRecommendationService
             });
         }
 
-        // Сортируем по оценке и берем топ-20
+        // Сортируем по оценке и берем топ-9
         recommendations = recommendations
             .OrderByDescending(r => r.Score)
-            .Take(20)
+            .Take(9)
             .ToList();
 
         _context.Recommendations.AddRange(recommendations);

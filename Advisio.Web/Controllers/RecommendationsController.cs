@@ -18,7 +18,7 @@ public class RecommendationsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<RecommendationDto>>> GetRecommendations(
         [FromQuery] int userId,
-        [FromQuery] int count = 10)
+        [FromQuery] int count = 9)
     {
         var recommendations = await _recommendationService.GetRecommendationsAsync(userId, count);
         return Ok(recommendations);

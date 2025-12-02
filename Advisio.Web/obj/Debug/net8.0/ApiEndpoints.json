@@ -1,8 +1,8 @@
 [
   {
     "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "LoadPlacesFromKufar",
-    "RelativePath": "api/Admin/places/load-kufar",
+    "Method": "AssignCategoriesToPlaces",
+    "RelativePath": "api/Admin/assign-categories",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -11,8 +11,18 @@
   },
   {
     "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "LoadPlacesFromKvitki",
-    "RelativePath": "api/Admin/places/load-kvitki",
+    "Method": "LoadKufarPlaces",
+    "RelativePath": "api/Admin/load-kufar",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.AdminController",
+    "Method": "LoadKvitkiPlaces",
+    "RelativePath": "api/Admin/load-kvitki",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -22,7 +32,7 @@
   {
     "ContainingType": "Advisio.Web.Controllers.AdminController",
     "Method": "SyncPlaces",
-    "RelativePath": "api/Admin/places/sync",
+    "RelativePath": "api/Admin/sync-places",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -102,6 +112,26 @@
     ]
   },
   {
+    "ContainingType": "Advisio.Web.Controllers.CategoriesController",
+    "Method": "GetAllCategories",
+    "RelativePath": "api/Categories",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[Advisio.Web.Controllers.CategoryDto, Advisio.Web, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
     "ContainingType": "Advisio.Web.Controllers.FixDataController",
     "Method": "FixEncoding",
     "RelativePath": "api/FixData/fix-encoding",
@@ -122,6 +152,21 @@
       {
         "Name": "userId",
         "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      },
+      {
+        "Name": "search",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "categoryId",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      },
+      {
+        "Name": "sortBy",
+        "Type": "System.String",
         "IsRequired": false
       }
     ],

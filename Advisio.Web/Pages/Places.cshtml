@@ -8,16 +8,33 @@
     <h1 class="mb-4">Места отдыха</h1>
     
     <div class="row mb-3">
-        <div class="col-md-6">
-            <input type="text" id="searchInput" class="form-control" placeholder="Поиск мест...">
+        <div class="col-md-4">
+            <input type="text" id="searchInput" class="form-control" placeholder="Поиск мест..." oninput="handleSearch()">
         </div>
-        <div class="col-md-6">
-            <select id="categoryFilter" class="form-select">
+        <div class="col-md-4">
+            <select id="categoryFilter" class="form-select" onchange="handleFilter()">
                 <option value="">Все категории</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <select id="sortBy" class="form-select" onchange="handleFilter()">
+                <option value="">Сортировка по умолчанию</option>
+                <option value="name">По названию (А-Я)</option>
+                <option value="name_desc">По названию (Я-А)</option>
+                <option value="likes">По лайкам (больше)</option>
+                <option value="likes_asc">По лайкам (меньше)</option>
+                <option value="created">По дате (новые)</option>
+                <option value="created_asc">По дате (старые)</option>
             </select>
         </div>
     </div>
 
+    <div id="loadingIndicator" class="text-center mb-3" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+    </div>
+    
     <div id="placesContainer" class="row">
         <!-- Места будут загружены через JavaScript -->
     </div>
@@ -26,6 +43,8 @@
 @section Scripts {
     <script>
         let userId = null;
+        let allPlaces = [];
+        let searchTimeout = null;
         
         async function getUserId() {
             try {
@@ -39,15 +58,101 @@
             }
         }
         
+        async function loadCategories() {
+            try {
+                const response = await fetch('/api/categories');
+                const categories = await response.json();
+                const categoryFilter = document.getElementById('categoryFilter');
+                
+                categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category.id;
+                    option.textContent = category.name;
+                    categoryFilter.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Ошибка загрузки категорий:', error);
+            }
+        }
+        
         async function loadPlaces() {
             try {
-                const url = userId ? `/api/places?userId=${userId}` : '/api/places';
+                const loadingIndicator = document.getElementById('loadingIndicator');
+                const container = document.getElementById('placesContainer');
+                loadingIndicator.style.display = 'block';
+                container.innerHTML = '';
+                
+                const searchQuery = document.getElementById('searchInput').value.trim();
+                const categoryIdValue = document.getElementById('categoryFilter').value;
+                const sortBy = document.getElementById('sortBy').value;
+                
+                // Формируем URL с правильными параметрами
+                const params = new URLSearchParams();
+                
+                if (userId) {
+                    params.append('userId', userId);
+                }
+                if (searchQuery) {
+                    params.append('search', searchQuery);
+                }
+                if (categoryIdValue && categoryIdValue !== '' && categoryIdValue !== '0') {
+                    const categoryId = parseInt(categoryIdValue);
+                    if (!isNaN(categoryId) && categoryId > 0) {
+                        params.append('categoryId', categoryId);
+                        console.log('Фильтр по категории:', categoryId);
+                    } else {
+                        console.warn('Некорректный categoryId:', categoryIdValue);
+                    }
+                }
+                if (sortBy) {
+                    params.append('sortBy', sortBy);
+                }
+                
+                const queryString = params.toString();
+                const url = `/api/places${queryString ? '?' + queryString : ''}`;
+                
+                console.log('Запрос мест:', url);
                 const response = await fetch(url);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Ошибка ответа:', response.status, errorText);
+                    let errorMessage = `Ошибка загрузки мест (${response.status})`;
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        if (errorJson.error) {
+                            errorMessage = errorJson.error;
+                            if (errorJson.details) {
+                                console.error('Детали ошибки:', errorJson.details);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Не удалось распарсить ошибку:', e);
+                    }
+                    throw new Error(errorMessage);
+                }
                 const places = await response.json();
+                console.log('Получено мест:', places.length);
+                allPlaces = places;
                 displayPlaces(places);
             } catch (error) {
                 console.error('Ошибка загрузки мест:', error);
+                document.getElementById('placesContainer').innerHTML = 
+                    '<div class="col-12"><div class="alert alert-danger">Ошибка загрузки мест. Попробуйте обновить страницу.</div></div>';
+            } finally {
+                document.getElementById('loadingIndicator').style.display = 'none';
             }
+        }
+        
+        function handleSearch() {
+            // Debounce для поиска
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                loadPlaces();
+            }, 300);
+        }
+        
+        function handleFilter() {
+            loadPlaces();
         }
 
         function displayPlaces(places) {
@@ -55,7 +160,20 @@
             container.innerHTML = '';
 
             if (places.length === 0) {
-                container.innerHTML = '<div class="col-12"><p class="text-muted">Места не найдены</p></div>';
+                const searchQuery = document.getElementById('searchInput').value.trim();
+                const categoryId = document.getElementById('categoryFilter').value;
+                
+                let message = 'Места не найдены';
+                if (searchQuery || categoryId) {
+                    message = 'По вашему запросу ничего не найдено. Попробуйте изменить параметры поиска или фильтрации.';
+                }
+                
+                container.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> ${message}
+                        </div>
+                    </div>`;
                 return;
             }
 
@@ -126,9 +244,37 @@
             }
         }
 
+        async function assignCategoriesIfNeeded() {
+            try {
+                // Вызываем метод присвоения категорий при первой загрузке
+                const response = await fetch('/api/admin/assign-categories', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Категории присвоены:', result.message);
+                } else {
+                    const errorText = await response.text();
+                    console.warn('Не удалось присвоить категории:', response.status, errorText);
+                }
+            } catch (error) {
+                console.warn('Ошибка при присвоении категорий (это нормально, если они уже присвоены):', error);
+            }
+        }
+
         (async () => {
-            await getUserId();
-            loadPlaces();
+            try {
+                await getUserId();
+                await loadCategories();
+                // Вызываем присвоение категорий в фоне, не блокируя загрузку
+                assignCategoriesIfNeeded().catch(err => console.warn('Фоновая задача присвоения категорий:', err));
+                loadPlaces();
+            } catch (error) {
+                console.error('Ошибка инициализации:', error);
+            }
         })();
     </script>
 }

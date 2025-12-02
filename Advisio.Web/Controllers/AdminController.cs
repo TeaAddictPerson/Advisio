@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Advisio.API.Services;
 
 namespace Advisio.Web.Controllers;
@@ -7,60 +8,86 @@ namespace Advisio.Web.Controllers;
 [Route("api/[controller]")]
 public class AdminController : ControllerBase
 {
+    private readonly IPlaceService _placeService;
     private readonly IKufarService _kufarService;
-    private readonly IPlacesSyncService? _syncService;
+    private readonly IServiceProvider _serviceProvider;
 
-    public AdminController(IKufarService kufarService, IPlacesSyncService? syncService = null)
+    public AdminController(
+        IPlaceService placeService,
+        IKufarService kufarService,
+        IServiceProvider serviceProvider)
     {
+        _placeService = placeService;
         _kufarService = kufarService;
-        _syncService = syncService;
+        _serviceProvider = serviceProvider;
     }
 
-    [HttpPost("places/load-kufar")]
-    public async Task<ActionResult> LoadPlacesFromKufar()
+    [HttpPost("assign-categories")]
+    public async Task<ActionResult> AssignCategoriesToPlaces()
     {
         try
         {
-            await _kufarService.LoadPlacesFromKufarAsync();
-            return Ok(new { message = "Места успешно загружены из Kufar.by" });
+            await _placeService.AssignCategoriesToPlacesWithoutCategoriesAsync();
+            return Ok(new { message = "Категории успешно присвоены местам без категорий" });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { error = ex.Message });
+            return StatusCode(500, new { error = $"Ошибка при присвоении категорий: {ex.Message}" });
         }
     }
 
-    [HttpPost("places/load-kvitki")]
-    public async Task<ActionResult> LoadPlacesFromKvitki()
-    {
-        try
-        {
-            await _kufarService.LoadPlacesFromKvitkiAsync();
-            return Ok(new { message = "Места успешно загружены из Kvitki.by" });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { error = ex.Message });
-        }
-    }
-
-    [HttpPost("places/sync")]
+    [HttpPost("sync-places")]
     public async Task<ActionResult> SyncPlaces()
     {
         try
         {
-            if (_syncService == null)
-            {
-                return BadRequest(new { error = "Сервис синхронизации не настроен" });
-            }
+            // Создаем scope для синхронизации
+            using var scope = _serviceProvider.CreateScope();
+            var kufarService = scope.ServiceProvider.GetRequiredService<IKufarService>();
+            var placeService = scope.ServiceProvider.GetRequiredService<IPlaceService>();
 
-            await _syncService.SyncPlacesAsync();
-            return Ok(new { message = "Синхронизация мест запущена" });
+            // Загружаем места из Kufar
+            await kufarService.LoadPlacesFromKufarAsync();
+            
+            // Загружаем места из Kvitki
+            await kufarService.LoadPlacesFromKvitkiAsync();
+            
+            // Присваиваем категории местам без категорий
+            await placeService.AssignCategoriesToPlacesWithoutCategoriesAsync();
+
+            return Ok(new { message = "Синхронизация мест завершена успешно." });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { error = ex.Message });
+            return StatusCode(500, new { error = $"Ошибка при синхронизации: {ex.Message}" });
+        }
+    }
+
+    [HttpPost("load-kufar")]
+    public async Task<ActionResult> LoadKufarPlaces()
+    {
+        try
+        {
+            await _kufarService.LoadPlacesFromKufarAsync();
+            return Ok(new { message = "Места из Kufar.by успешно загружены" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = $"Ошибка при загрузке мест из Kufar: {ex.Message}" });
+        }
+    }
+
+    [HttpPost("load-kvitki")]
+    public async Task<ActionResult> LoadKvitkiPlaces()
+    {
+        try
+        {
+            await _kufarService.LoadPlacesFromKvitkiAsync();
+            return Ok(new { message = "Места из Kvitki.by успешно загружены" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = $"Ошибка при загрузке мест из Kvitki: {ex.Message}" });
         }
     }
 }
-

@@ -16,10 +16,33 @@ public class PlacesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<PlaceDto>>> GetAllPlaces([FromQuery] int? userId = null)
+    public async Task<ActionResult<List<PlaceDto>>> GetAllPlaces(
+        [FromQuery] int? userId = null,
+        [FromQuery] string? search = null,
+        [FromQuery] int? categoryId = null,
+        [FromQuery] string? sortBy = null)
     {
-        var places = await _placeService.GetAllPlacesAsync(userId);
-        return Ok(places);
+        try
+        {
+            // Логируем параметры запроса
+            System.Diagnostics.Debug.WriteLine($"GetAllPlaces: userId={userId}, search={search}, categoryId={categoryId}, sortBy={sortBy}");
+            
+            var places = await _placeService.GetAllPlacesAsync(userId, search, categoryId, sortBy);
+            
+            System.Diagnostics.Debug.WriteLine($"GetAllPlaces: возвращено {places.Count} мест");
+            
+            return Ok(places);
+        }
+        catch (Exception ex)
+        {
+            // Логируем детальную ошибку
+            System.Diagnostics.Debug.WriteLine($"Ошибка в GetAllPlaces: {ex.Message}\n{ex.StackTrace}");
+            return StatusCode(500, new { 
+                error = ex.Message, 
+                details = ex.ToString(),
+                innerException = ex.InnerException?.Message
+            });
+        }
     }
 
     [HttpGet("{id}")]

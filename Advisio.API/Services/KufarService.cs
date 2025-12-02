@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Net.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Advisio.API.Data;
@@ -43,8 +44,8 @@ public class KufarService : IKufarService
             var apiUrl = _configuration["ExternalApis:KufarApi"] ?? 
                         "https://api.kufar.by/search-api/v1/search/rendered-paginated";
             
-            // Параметры запроса для поиска развлечений
-            var queryParams = "?cat=1700&rgn=1&size=30&sort=lst.d"; // cat=1700 - развлечения
+            // Параметры запроса для поиска развлечений - запрашиваем максимум результатов
+            var queryParams = "?cat=1700&rgn=1&size=1000&sort=lst.d"; // cat=1700 - развлечения, size=1000 - максимум результатов
             var fullUrl = apiUrl + queryParams;
 
             _httpClient.DefaultRequestHeaders.Clear();
@@ -63,8 +64,12 @@ public class KufarService : IKufarService
 
             int addedCount = 0;
             int updatedCount = 0;
+            
+            // Загружаем все доступные места из источника
+            var placesToProcess = kufarData.Ads.ToList();
+            _logger?.LogInformation("Обработка {Count} мест из Kufar", placesToProcess.Count);
 
-            foreach (var ad in kufarData.Ads.Take(50)) // Ограничиваем до 50 объявлений
+            foreach (var ad in placesToProcess)
             {
                 if (string.IsNullOrWhiteSpace(ad.Subject))
                     continue;
@@ -147,14 +152,58 @@ public class KufarService : IKufarService
     {
         try
         {
-            var apiUrl = _configuration["ExternalApis:KvitkiApi"] ?? 
-                        "https://kvitki.by/api/events";
+            // Пробуем разные варианты URL для Kvitki
+            var apiUrls = new[]
+            {
+                _configuration["ExternalApis:KvitkiApi"] ?? "https://www.kvitki.by/api/events",
+                "https://kvitki.by/api/events",
+                "https://www.kvitki.by/events"
+            };
 
-            _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0");
-            _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            string? response = null;
+            Exception? lastException = null;
 
-            var response = await _httpClient.GetStringAsync(apiUrl);
+            foreach (var apiUrl in apiUrls)
+            {
+                try
+                {
+                    _logger?.LogInformation("Попытка загрузки из Kvitki: {Url}", apiUrl);
+                    
+                    // Используем отдельный HttpClient с поддержкой редиректов
+                    var handler = new HttpClientHandler
+                    {
+                        AllowAutoRedirect = true,
+                        MaxAutomaticRedirections = 5
+                    };
+                    
+                    using var httpClient = new HttpClient(handler)
+                    {
+                        Timeout = TimeSpan.FromSeconds(30)
+                    };
+                    
+                    httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                    httpClient.DefaultRequestHeaders.Add("Accept", "application/json, text/plain, */*");
+                    httpClient.DefaultRequestHeaders.Add("Accept-Language", "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7");
+
+                    var httpResponse = await httpClient.GetAsync(apiUrl);
+                    httpResponse.EnsureSuccessStatusCode();
+                    
+                    response = await httpResponse.Content.ReadAsStringAsync();
+                    _logger?.LogInformation("Успешно загружено из Kvitki: {Url}", apiUrl);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Не удалось загрузить из {Url}, пробуем следующий", apiUrl);
+                    lastException = ex;
+                    continue;
+                }
+            }
+
+            if (string.IsNullOrEmpty(response))
+            {
+                throw new Exception($"Не удалось загрузить данные из Kvitki.by. Последняя ошибка: {lastException?.Message}");
+            }
             var kvitkiData = JsonSerializer.Deserialize<KvitkiResponse>(response, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
@@ -167,8 +216,12 @@ public class KufarService : IKufarService
 
             int addedCount = 0;
             int updatedCount = 0;
+            
+            // Загружаем все доступные события из источника
+            var eventsToProcess = kvitkiData.Events.ToList();
+            _logger?.LogInformation("Обработка {Count} событий из Kvitki", eventsToProcess.Count);
 
-            foreach (var evt in kvitkiData.Events.Take(50))
+            foreach (var evt in eventsToProcess)
             {
                 if (string.IsNullOrWhiteSpace(evt.Title))
                     continue;

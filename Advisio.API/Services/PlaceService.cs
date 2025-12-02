@@ -14,15 +14,47 @@ public class PlaceService : IPlaceService
         _context = context;
     }
 
-    public async Task<List<PlaceDto>> GetAllPlacesAsync(int? userId = null)
+    public async Task<List<PlaceDto>> GetAllPlacesAsync(int? userId = null, string? searchQuery = null, int? categoryId = null, string? sortBy = null)
     {
         try
         {
-            var places = await _context.Places
+            var query = _context.Places
                 .Include(p => p.PlaceCategories)
                     .ThenInclude(pc => pc.Category)
                 .Include(p => p.Likes)
-                .ToListAsync();
+                .AsQueryable();
+
+            // Поиск по названию или описанию
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+            {
+                var searchLower = searchQuery.ToLower();
+                query = query.Where(p => 
+                    (p.Name != null && p.Name.ToLower().Contains(searchLower)) ||
+                    (p.Description != null && p.Description.ToLower().Contains(searchLower)) ||
+                    (p.Address != null && p.Address.ToLower().Contains(searchLower))
+                );
+            }
+
+            // Фильтрация по категории
+            if (categoryId.HasValue && categoryId.Value > 0)
+            {
+                query = query.Where(p => p.PlaceCategories != null && 
+                                         p.PlaceCategories.Any(pc => pc.CategoryId == categoryId.Value));
+            }
+
+            // Сортировка
+            query = sortBy?.ToLower() switch
+            {
+                "name" => query.OrderBy(p => p.Name),
+                "name_desc" => query.OrderByDescending(p => p.Name),
+                "likes" => query.OrderByDescending(p => p.Likes != null ? p.Likes.Count : 0),
+                "likes_asc" => query.OrderBy(p => p.Likes != null ? p.Likes.Count : 0),
+                "created" => query.OrderByDescending(p => p.CreatedAt),
+                "created_asc" => query.OrderBy(p => p.CreatedAt),
+                _ => query.OrderByDescending(p => p.CreatedAt) // По умолчанию по дате создания
+            };
+
+            var places = await query.ToListAsync();
 
             HashSet<int>? favoritePlaceIds = null;
             HashSet<int>? likedPlaceIds = null;
@@ -40,11 +72,20 @@ public class PlaceService : IPlaceService
                     .ToListAsync()).ToHashSet();
             }
 
-            return places.Select(p => MapToDto(p, userId, favoritePlaceIds, likedPlaceIds)).ToList();
+            var result = places.Select(p => MapToDto(p, userId, favoritePlaceIds, likedPlaceIds)).ToList();
+            
+            // Логируем для отладки
+            if (categoryId.HasValue)
+            {
+                System.Diagnostics.Debug.WriteLine($"Фильтрация по категории {categoryId.Value}: найдено {result.Count} мест");
+            }
+            
+            return result;
         }
         catch (Exception ex)
         {
             // Логируем ошибку для отладки
+            System.Diagnostics.Debug.WriteLine($"Ошибка при получении мест: {ex.Message}\n{ex.StackTrace}");
             throw new Exception($"Ошибка при получении мест: {ex.Message}", ex);
         }
     }
@@ -215,6 +256,118 @@ public class PlaceService : IPlaceService
         var likedPlaceIds = likes.Select(p => p.Id).ToHashSet();
 
         return likes.Select(p => MapToDto(p, userId, favoritePlaceIds, likedPlaceIds)).ToList();
+    }
+
+    public async Task AssignCategoriesToPlacesWithoutCategoriesAsync()
+    {
+        try
+        {
+            // Получаем все места без категорий
+            var placesWithoutCategories = await _context.Places
+                .Include(p => p.PlaceCategories)
+                .Where(p => !p.PlaceCategories.Any())
+                .ToListAsync();
+
+            if (!placesWithoutCategories.Any())
+                return;
+
+        // Получаем все категории
+        var categories = await _context.Categories.ToListAsync();
+
+        // Находим категории по ключевым словам
+        var activeCategory = categories.FirstOrDefault(c => 
+            c.Name.Contains("Активный отдых", StringComparison.OrdinalIgnoreCase));
+        var calmCategory = categories.FirstOrDefault(c => 
+            c.Name.Contains("Спокойный отдых", StringComparison.OrdinalIgnoreCase));
+        var natureCategory = categories.FirstOrDefault(c => 
+            c.Name.Contains("На природе", StringComparison.OrdinalIgnoreCase));
+        var friendsCategory = categories.FirstOrDefault(c => 
+            c.Name.Contains("С друзьями", StringComparison.OrdinalIgnoreCase));
+        var familyCategory = categories.FirstOrDefault(c => 
+            c.Name.Contains("С семьей", StringComparison.OrdinalIgnoreCase));
+        var childCategory = categories.FirstOrDefault(c => 
+            c.Name.Contains("С ребенком", StringComparison.OrdinalIgnoreCase));
+
+        int assignedCount = 0;
+
+        foreach (var place in placesWithoutCategories)
+        {
+            var categoryIds = new List<int>();
+            var text = ((place.Name ?? "") + " " + (place.Description ?? "")).ToLower();
+
+            // Определяем категории на основе текста
+            if (activeCategory != null && 
+                (text.Contains("спорт") || text.Contains("фитнес") || text.Contains("актив") || 
+                 text.Contains("тренировк") || text.Contains("заняти")))
+            {
+                categoryIds.Add(activeCategory.Id);
+            }
+
+            if (calmCategory != null && 
+                (text.Contains("музей") || text.Contains("театр") || text.Contains("выставка") || 
+                 text.Contains("кино") || text.Contains("концерт") || text.Contains("галерея")))
+            {
+                categoryIds.Add(calmCategory.Id);
+            }
+
+            if (natureCategory != null && 
+                (text.Contains("парк") || text.Contains("природа") || text.Contains("лес") || 
+                 text.Contains("озеро") || text.Contains("река") || text.Contains("пляж")))
+            {
+                categoryIds.Add(natureCategory.Id);
+            }
+
+            // Определяем категорию по типу компании
+            if (familyCategory != null && 
+                (text.Contains("семья") || text.Contains("семейн")))
+            {
+                categoryIds.Add(familyCategory.Id);
+            }
+            else if (childCategory != null && 
+                     (text.Contains("дет") || text.Contains("ребенок") || text.Contains("малыш")))
+            {
+                categoryIds.Add(childCategory.Id);
+            }
+            else if (friendsCategory != null)
+            {
+                // По умолчанию - с друзьями
+                categoryIds.Add(friendsCategory.Id);
+            }
+
+            // Если не определили ни одной категории, добавляем "С друзьями" по умолчанию
+            if (!categoryIds.Any() && friendsCategory != null)
+            {
+                categoryIds.Add(friendsCategory.Id);
+            }
+
+            // Получаем существующие категории для этого места
+            var existingCategoryIds = await _context.PlaceCategories
+                .Where(pc => pc.PlaceId == place.Id)
+                .Select(pc => pc.CategoryId)
+                .ToListAsync();
+
+            // Добавляем категории к месту
+            foreach (var categoryId in categoryIds)
+            {
+                if (!existingCategoryIds.Contains(categoryId))
+                {
+                    _context.PlaceCategories.Add(new PlaceCategory
+                    {
+                        PlaceId = place.Id,
+                        CategoryId = categoryId
+                    });
+                }
+            }
+
+            assignedCount++;
+        }
+
+        await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Ошибка при присвоении категорий местам: {ex.Message}", ex);
+        }
     }
 
     private PlaceDto MapToDto(Place place, int? userId, HashSet<int>? favoritePlaceIds = null, HashSet<int>? likedPlaceIds = null)
