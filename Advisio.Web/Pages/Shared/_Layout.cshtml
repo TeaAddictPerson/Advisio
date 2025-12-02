@@ -33,6 +33,34 @@
                             <a class="nav-link text-dark" asp-area="" asp-page="/Survey">Опрос</a>
                         </li>
                     </ul>
+                    <ul class="navbar-nav">
+                        @{
+                            var userId = Context.Session.GetInt32("UserId");
+                            var username = Context.Session.GetString("Username");
+                        }
+                        @if (userId != null && !string.IsNullOrEmpty(username))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-page="/Profile">
+                                    <i class="bi bi-person-circle"></i> @username
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <form method="post" asp-page="/Profile" asp-page-handler="Logout" class="d-inline">
+                                    <button type="submit" class="btn btn-link nav-link text-dark border-0 p-0 ms-2">Выйти</button>
+                                </form>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-page="/Login">Войти</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-page="/Register">Зарегистрироваться</a>
+                            </li>
+                        }
+                    </ul>
                 </div>
             </div>
         </nav>

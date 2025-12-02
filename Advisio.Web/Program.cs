@@ -14,6 +14,15 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Sessions для аутентификации
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
 // Database
 builder.Services.AddDbContext<AdvisioDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"), 
@@ -25,6 +34,7 @@ builder.Services.AddScoped<IPlaceService, PlaceService>();
 builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 builder.Services.AddScoped<ISurveyService, SurveyService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IExternalPlaceService, ExternalPlaceService>();
 builder.Services.AddScoped<IKufarService, KufarService>();
 builder.Services.AddHttpClient<IExternalPlaceService, ExternalPlaceService>();
@@ -69,6 +79,7 @@ app.UseStaticFiles();
 app.UseRouting();
 
 app.UseCors("AllowAll");
+app.UseSession();
 app.UseAuthorization();
 
 app.MapRazorPages();

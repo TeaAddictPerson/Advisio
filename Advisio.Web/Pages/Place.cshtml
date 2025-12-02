@@ -10,12 +10,25 @@
 
 @section Scripts {
     <script>
-        let userId = 1;
+        let userId = null;
         const placeId = @Model.Id;
+        
+        async function getUserId() {
+            try {
+                const response = await fetch('/api/auth/check');
+                const data = await response.json();
+                if (data.isAuthenticated) {
+                    userId = data.userId;
+                }
+            } catch (error) {
+                console.error('Ошибка получения userId:', error);
+            }
+        }
 
         async function loadPlace() {
             try {
-                const response = await fetch(`/api/places/${placeId}?userId=${userId}`);
+                const url = userId ? `/api/places/${placeId}?userId=${userId}` : `/api/places/${placeId}`;
+                const response = await fetch(url);
                 if (response.status === 404) {
                     document.getElementById('placeContainer').innerHTML = 
                         '<div class="alert alert-warning">Место не найдено</div>';
@@ -91,6 +104,11 @@
         }
 
         async function toggleFavorite(placeId) {
+            if (!userId) {
+                alert('Необходимо войти в систему');
+                window.location.href = '/Login';
+                return;
+            }
             try {
                 const response = await fetch(`/api/places/${placeId}/favorites?userId=${userId}`, {
                     method: 'POST'
@@ -104,6 +122,11 @@
         }
 
         async function toggleLike(placeId) {
+            if (!userId) {
+                alert('Необходимо войти в систему');
+                window.location.href = '/Login';
+                return;
+            }
             try {
                 const response = await fetch(`/api/places/${placeId}/likes?userId=${userId}`, {
                     method: 'POST'
@@ -116,7 +139,10 @@
             }
         }
 
-        loadPlace();
+        (async () => {
+            await getUserId();
+            loadPlace();
+        })();
     </script>
 }
 

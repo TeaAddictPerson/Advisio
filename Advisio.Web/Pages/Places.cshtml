@@ -25,11 +25,24 @@
 
 @section Scripts {
     <script>
-        let userId = 1; // Временный ID пользователя, позже можно добавить аутентификацию
+        let userId = null;
+        
+        async function getUserId() {
+            try {
+                const response = await fetch('/api/auth/check');
+                const data = await response.json();
+                if (data.isAuthenticated) {
+                    userId = data.userId;
+                }
+            } catch (error) {
+                console.error('Ошибка получения userId:', error);
+            }
+        }
         
         async function loadPlaces() {
             try {
-                const response = await fetch(`/api/places?userId=${userId}`);
+                const url = userId ? `/api/places?userId=${userId}` : '/api/places';
+                const response = await fetch(url);
                 const places = await response.json();
                 displayPlaces(places);
             } catch (error) {
@@ -78,6 +91,11 @@
         }
 
         async function toggleFavorite(placeId) {
+            if (!userId) {
+                alert('Необходимо войти в систему');
+                window.location.href = '/Login';
+                return;
+            }
             try {
                 const response = await fetch(`/api/places/${placeId}/favorites?userId=${userId}`, {
                     method: 'POST'
@@ -91,6 +109,11 @@
         }
 
         async function toggleLike(placeId) {
+            if (!userId) {
+                alert('Необходимо войти в систему');
+                window.location.href = '/Login';
+                return;
+            }
             try {
                 const response = await fetch(`/api/places/${placeId}/likes?userId=${userId}`, {
                     method: 'POST'
@@ -103,7 +126,10 @@
             }
         }
 
-        loadPlaces();
+        (async () => {
+            await getUserId();
+            loadPlaces();
+        })();
     </script>
 }
 

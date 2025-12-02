@@ -1,0 +1,72 @@
+@page
+@model Advisio.Web.Pages.RegisterModel
+@{
+    ViewData["Title"] = "Регистрация";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <h2 class="text-center mb-4">Регистрация</h2>
+        
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger" role="alert">
+                @Model.ErrorMessage
+            </div>
+        }
+
+        <form method="post">
+            <div class="mb-3">
+                <label asp-for="RegisterDto.Username" class="form-label">Имя пользователя</label>
+                <input asp-for="RegisterDto.Username" class="form-control" required />
+                <span asp-validation-for="RegisterDto.Username" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="RegisterDto.Email" class="form-label">Email</label>
+                <input asp-for="RegisterDto.Email" type="email" class="form-control" required />
+                <span asp-validation-for="RegisterDto.Email" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="RegisterDto.Password" class="form-label">Пароль</label>
+                <div class="input-group">
+                    <input asp-for="RegisterDto.Password" type="password" id="passwordInput" class="form-control" required />
+                    <button class="btn btn-outline-secondary" type="button" id="togglePassword" onclick="togglePasswordVisibility('passwordInput', 'togglePassword')">
+                        <i class="bi bi-eye" id="togglePasswordIcon"></i>
+                    </button>
+                </div>
+                <span asp-validation-for="RegisterDto.Password" class="text-danger"></span>
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
+            </div>
+
+            <div class="text-center mt-3">
+                <p>Уже есть аккаунт? <a asp-page="/Login">Войти</a></p>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        function togglePasswordVisibility(inputId, buttonId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(buttonId + 'Icon');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        }
+    </script>
+}
+

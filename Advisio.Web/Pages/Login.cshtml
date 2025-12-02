@@ -1,0 +1,66 @@
+@page
+@model Advisio.Web.Pages.LoginModel
+@{
+    ViewData["Title"] = "Вход";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <h2 class="text-center mb-4">Вход</h2>
+        
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger" role="alert">
+                @Model.ErrorMessage
+            </div>
+        }
+
+        <form method="post">
+            <div class="mb-3">
+                <label asp-for="LoginDto.Email" class="form-label">Email</label>
+                <input asp-for="LoginDto.Email" type="email" class="form-control" required />
+                <span asp-validation-for="LoginDto.Email" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="LoginDto.Password" class="form-label">Пароль</label>
+                <div class="input-group">
+                    <input asp-for="LoginDto.Password" type="password" id="passwordInput" class="form-control" required />
+                    <button class="btn btn-outline-secondary" type="button" id="togglePassword" onclick="togglePasswordVisibility('passwordInput', 'togglePassword')">
+                        <i class="bi bi-eye" id="togglePasswordIcon"></i>
+                    </button>
+                </div>
+                <span asp-validation-for="LoginDto.Password" class="text-danger"></span>
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Войти</button>
+            </div>
+
+            <div class="text-center mt-3">
+                <p>Нет аккаунта? <a asp-page="/Register">Зарегистрироваться</a></p>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        function togglePasswordVisibility(inputId, buttonId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(buttonId + 'Icon');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        }
+    </script>
+}
+

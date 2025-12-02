@@ -1,0 +1,204 @@
+@page
+@model Advisio.Web.Pages.ProfileModel
+@{
+    ViewData["Title"] = "Профиль";
+}
+
+@if (Model.Profile == null)
+{
+    <div class="alert alert-danger" role="alert">
+        @(Model.ErrorMessage ?? "Профиль не найден")
+    </div>
+    return;
+}
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3>Профиль пользователя</h3>
+                    <form method="post" asp-page-handler="Logout">
+                        <button type="submit" class="btn btn-outline-danger">Выйти</button>
+                    </form>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            @Model.SuccessMessage
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+                    
+                    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            @Model.ErrorMessage
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    <ul class="nav nav-tabs mb-3" id="profileTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="view-tab" data-bs-toggle="tab" data-bs-target="#view" type="button" role="tab">
+                                Просмотр
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="edit-tab" data-bs-toggle="tab" data-bs-target="#edit" type="button" role="tab">
+                                Редактировать
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="profileTabContent">
+                        <div class="tab-pane fade show active" id="view" role="tabpanel">
+                            <div class="row mb-3">
+                                <div class="col-md-2"><strong>Имя:</strong></div>
+                                <div class="col-md-10">@Model.Profile.User.Username</div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-2"><strong>Email:</strong></div>
+                                <div class="col-md-10">@Model.Profile.User.Email</div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-2"><strong>Дата регистрации:</strong></div>
+                                <div class="col-md-10">@Model.Profile.User.CreatedAt.ToString("dd.MM.yyyy HH:mm")</div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="edit" role="tabpanel">
+                            <form method="post" asp-page-handler="UpdateProfile">
+                                <div class="mb-3">
+                                    <label asp-for="UpdateProfileDto.Username" class="form-label">Имя пользователя</label>
+                                    <input asp-for="UpdateProfileDto.Username" class="form-control" required />
+                                    <span asp-validation-for="UpdateProfileDto.Username" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="UpdateProfileDto.Email" class="form-label">Email</label>
+                                    <input asp-for="UpdateProfileDto.Email" type="email" class="form-control" required />
+                                    <span asp-validation-for="UpdateProfileDto.Email" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="UpdateProfileDto.CurrentPassword" class="form-label">Текущий пароль (требуется для смены пароля)</label>
+                                    <div class="input-group">
+                                        <input asp-for="UpdateProfileDto.CurrentPassword" type="password" id="currentPasswordInput" class="form-control" />
+                                        <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('currentPasswordInput', 'toggleCurrentPassword')">
+                                            <i class="bi bi-eye" id="toggleCurrentPasswordIcon"></i>
+                                        </button>
+                                    </div>
+                                    <span asp-validation-for="UpdateProfileDto.CurrentPassword" class="text-danger"></span>
+                                    <small class="form-text text-muted">Оставьте пустым, если не хотите менять пароль</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="UpdateProfileDto.NewPassword" class="form-label">Новый пароль</label>
+                                    <div class="input-group">
+                                        <input asp-for="UpdateProfileDto.NewPassword" type="password" id="newPasswordInput" class="form-control" />
+                                        <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('newPasswordInput', 'toggleNewPassword')">
+                                            <i class="bi bi-eye" id="toggleNewPasswordIcon"></i>
+                                        </button>
+                                    </div>
+                                    <span asp-validation-for="UpdateProfileDto.NewPassword" class="text-danger"></span>
+                                    <small class="form-text text-muted">Оставьте пустым, если не хотите менять пароль</small>
+                                </div>
+
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-heart-fill text-danger"></i> Избранные места (@Model.Profile.Favorites.Count)</h5>
+                        </div>
+                        <div class="card-body">
+                            @if (Model.Profile.Favorites.Any())
+                            {
+                                <div class="list-group">
+                                    @foreach (var place in Model.Profile.Favorites)
+                                    {
+                                        <a href="/Place/@place.Id" class="list-group-item list-group-item-action">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">@place.Name</h6>
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(place.Description))
+                                            {
+                                                <p class="mb-1">@(place.Description.Length > 100 ? place.Description.Substring(0, 100) + "..." : place.Description)</p>
+                                            }
+                                        </a>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <p class="text-muted">У вас пока нет избранных мест</p>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-hand-thumbs-up-fill text-primary"></i> Понравившиеся места (@Model.Profile.LikedPlaces.Count)</h5>
+                        </div>
+                        <div class="card-body">
+                            @if (Model.Profile.LikedPlaces.Any())
+                            {
+                                <div class="list-group">
+                                    @foreach (var place in Model.Profile.LikedPlaces)
+                                    {
+                                        <a href="/Place/@place.Id" class="list-group-item list-group-item-action">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">@place.Name</h6>
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(place.Description))
+                                            {
+                                                <p class="mb-1">@(place.Description.Length > 100 ? place.Description.Substring(0, 100) + "..." : place.Description)</p>
+                                            }
+                                        </a>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <p class="text-muted">Вы еще не поставили лайки</p>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        function togglePasswordVisibility(inputId, buttonId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(buttonId + 'Icon');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        }
+    </script>
+}
+

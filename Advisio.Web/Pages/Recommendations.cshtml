@@ -14,9 +14,26 @@
 
 @section Scripts {
     <script>
-        let userId = 1; // Временный ID пользователя
+        let userId = null;
+        
+        async function getUserId() {
+            try {
+                const response = await fetch('/api/auth/check');
+                const data = await response.json();
+                if (data.isAuthenticated) {
+                    userId = data.userId;
+                }
+            } catch (error) {
+                console.error('Ошибка получения userId:', error);
+            }
+        }
         
         async function loadRecommendations() {
+            if (!userId) {
+                document.getElementById('recommendationsContainer').innerHTML = 
+                    '<div class="col-12"><div class="alert alert-warning">Необходимо войти в систему для получения рекомендаций. <a href="/Login" class="alert-link">Войти</a></div></div>';
+                return;
+            }
             try {
                 const response = await fetch(`/api/recommendations?userId=${userId}&count=20`);
                 const recommendations = await response.json();
@@ -82,6 +99,11 @@
         }
 
         async function toggleFavorite(placeId) {
+            if (!userId) {
+                alert('Необходимо войти в систему');
+                window.location.href = '/Login';
+                return;
+            }
             try {
                 const response = await fetch(`/api/places/${placeId}/favorites?userId=${userId}`, {
                     method: 'POST'
@@ -95,6 +117,11 @@
         }
 
         async function toggleLike(placeId) {
+            if (!userId) {
+                alert('Необходимо войти в систему');
+                window.location.href = '/Login';
+                return;
+            }
             try {
                 const response = await fetch(`/api/places/${placeId}/likes?userId=${userId}`, {
                     method: 'POST'
@@ -107,7 +134,10 @@
             }
         }
 
-        loadRecommendations();
+        (async () => {
+            await getUserId();
+            loadRecommendations();
+        })();
     </script>
 }
 

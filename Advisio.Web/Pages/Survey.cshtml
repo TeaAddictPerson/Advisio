@@ -14,8 +14,26 @@
 
 @section Scripts {
     <script>
-        let userId = 1; // Временный ID пользователя
+        let userId = null;
         let surveyData = null;
+        
+        async function getUserId() {
+            try {
+                const response = await fetch('/api/auth/check');
+                const data = await response.json();
+                if (data.isAuthenticated) {
+                    userId = data.userId;
+                } else {
+                    document.getElementById('surveyContainer').innerHTML = 
+                        '<div class="alert alert-warning">Необходимо войти в систему для прохождения опроса. <a href="/Login" class="alert-link">Войти</a></div>';
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                console.error('Ошибка получения userId:', error);
+                return false;
+            }
+        }
 
         async function loadSurvey() {
             try {
@@ -83,6 +101,12 @@
         }
 
         async function submitSurvey() {
+            if (!userId) {
+                alert('Необходимо войти в систему');
+                window.location.href = '/Login';
+                return;
+            }
+            
             const form = document.getElementById('surveyForm');
             const formData = new FormData(form);
             
@@ -127,7 +151,12 @@
             }
         }
 
-        loadSurvey();
+        (async () => {
+            const isAuthenticated = await getUserId();
+            if (isAuthenticated) {
+                loadSurvey();
+            }
+        })();
     </script>
 }
 
