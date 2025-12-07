@@ -26,44 +26,44 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
         _logger = logger;
         _configuration = configuration;
         
-        // Получаем интервал синхронизации из конфигурации (по умолчанию 24 часа)
-        var intervalHours = _configuration.GetValue<int>("PlacesSync:IntervalHours", 24);
+        var intervalHours = _configuration.GetValue<double>("PlacesSync:IntervalHours", 0.25);
         _syncInterval = TimeSpan.FromHours(intervalHours);
+        
+        _logger.LogInformation("⚙️ Настройки синхронизации: Интервал = {Interval} часов, Максимум мест = {MaxPlaces}", 
+            intervalHours, _configuration.GetValue<int>("PlacesSync:MaxPlacesPerSync", 2000));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Сервис синхронизации мест запущен. Интервал: {Interval}", _syncInterval);
+        _logger.LogInformation("🚀 Сервис синхронизации мест запущен. Интервал: {Interval}", _syncInterval);
 
-        // Сразу запускаем первую синхронизацию при старте
         try
         {
-            _logger.LogInformation("Запуск первоначальной синхронизации мест...");
+            _logger.LogInformation("🔄 Запуск первоначальной синхронизации мест...");
             await SyncPlacesAsync();
-            _logger.LogInformation("Первоначальная синхронизация завершена успешно");
+            _logger.LogInformation("✅ Первоначальная синхронизация завершена успешно");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при первоначальной синхронизации");
+            _logger.LogError(ex, "❌ Ошибка при первоначальной синхронизации");
         }
 
-        // Ждем перед следующей синхронизацией
         await Task.Delay(_syncInterval, stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                _logger.LogInformation("Начало синхронизации мест в {Time}", DateTime.Now);
+                _logger.LogInformation("🔄 НАЧАЛО СИНХРОНИЗАЦИИ в {Time}", DateTime.Now);
                 await SyncPlacesAsync();
-                _logger.LogInformation("Синхронизация мест завершена успешно в {Time}", DateTime.Now);
+                _logger.LogInformation("✅ СИНХРОНИЗАЦИЯ ЗАВЕРШЕНА в {Time}", DateTime.Now);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Ошибка при синхронизации мест в {Time}", DateTime.Now);
+                _logger.LogError(ex, "❌ ОШИБКА СИНХРОНИЗАЦИИ в {Time}: {Error}", DateTime.Now, ex.Message);
             }
 
-            // Ждем до следующей синхронизации
+            _logger.LogInformation("⏳ Ожидание {Interval} до следующей синхронизации...", _syncInterval);
             await Task.Delay(_syncInterval, stoppingToken);
         }
     }
@@ -73,25 +73,24 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
         using var scope = _serviceProvider.CreateScope();
         var kufarService = scope.ServiceProvider.GetRequiredService<IKufarService>();
 
-        try
-        {
-            // Загружаем места из Kufar
-            _logger.LogInformation("Загрузка мест из Kufar.by...");
-            await kufarService.LoadPlacesFromKufarAsync();
-            _logger.LogInformation("Места из Kufar.by загружены успешно");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ошибка при загрузке мест из Kufar.by");
-            // Продолжаем выполнение даже если один источник не работает
-        }
+        // Отключена загрузка из Kufar - используем только Kvitki.by
+        // try
+        // {
+        //     _logger.LogInformation("🔄 Загрузка мест из Kufar.by...");
+        //     await kufarService.LoadPlacesFromKufarAsync();
+        //     _logger.LogInformation("✅ Kufar.by загружен успешно");
+        // }
+        // catch (Exception ex)
+        // {
+        //     _logger.LogError(ex, "❌ ОШИБКА загрузки Kufar.by: {Error}", ex.Message);
+        // }
 
         try
         {
-            // Загружаем места из Kvitki
-            _logger.LogInformation("Загрузка мест из Kvitki.by...");
+            // Загружаем места из Kvitki.by (только билеты на развлечения)
+            _logger.LogInformation("🔄 Загрузка мест из Kvitki.by (только билеты на развлечения)...");
             await kufarService.LoadPlacesFromKvitkiAsync();
-            _logger.LogInformation("Места из Kvitki.by загружены успешно");
+            _logger.LogInformation("✅ Места из Kvitki.by загружены успешно");
         }
         catch (Exception ex)
         {

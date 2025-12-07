@@ -29,7 +29,7 @@
         }
       }
     },
-    "/api/Admin/load-kufar": {
+    "/api/Admin/load-kvitki": {
       "post": {
         "tags": [
           "Admin"
@@ -41,7 +41,7 @@
         }
       }
     },
-    "/api/Admin/load-kvitki": {
+    "/api/Admin/clear-places-keep-first-7": {
       "post": {
         "tags": [
           "Admin"

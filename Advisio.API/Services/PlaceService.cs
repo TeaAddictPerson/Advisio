@@ -43,7 +43,8 @@ public class PlaceService : IPlaceService
             }
 
             // Сортировка
-            query = sortBy?.ToLower() switch
+            var sortByLower = string.IsNullOrEmpty(sortBy) ? null : sortBy.ToLower();
+            query = sortByLower switch
             {
                 "name" => query.OrderBy(p => p.Name),
                 "name_desc" => query.OrderByDescending(p => p.Name),
@@ -54,7 +55,11 @@ public class PlaceService : IPlaceService
                 _ => query.OrderByDescending(p => p.CreatedAt) // По умолчанию по дате создания
             };
 
-            var places = await query.ToListAsync();
+            var totalCount = await query.CountAsync();
+            System.Diagnostics.Debug.WriteLine($"Всего мест в запросе: {totalCount}");
+            
+            var places = await query.Take(20).ToListAsync();
+            System.Diagnostics.Debug.WriteLine($"Взято мест после Take(20): {places.Count}");
 
             HashSet<int>? favoritePlaceIds = null;
             HashSet<int>? likedPlaceIds = null;
@@ -74,7 +79,7 @@ public class PlaceService : IPlaceService
 
             var result = places.Select(p => MapToDto(p, userId, favoritePlaceIds, likedPlaceIds)).ToList();
             
-            // Логируем для отладки
+            System.Diagnostics.Debug.WriteLine($"Возвращено мест: {result.Count}");
             if (categoryId.HasValue)
             {
                 System.Diagnostics.Debug.WriteLine($"Фильтрация по категории {categoryId.Value}: найдено {result.Count} мест");
@@ -121,10 +126,25 @@ public class PlaceService : IPlaceService
 
     public async Task<PlaceDto> CreatePlaceAsync(CreatePlaceDto createPlaceDto)
     {
+        // Валидация
+        if (string.IsNullOrWhiteSpace(createPlaceDto.Name))
+        {
+            throw new ArgumentException("Название места не может быть пустым", nameof(createPlaceDto));
+        }
+
+        // Проверяем, не существует ли уже место с таким именем (case-insensitive)
+        var existingPlace = await _context.Places
+            .FirstOrDefaultAsync(p => p.Name != null && p.Name.ToLower() == createPlaceDto.Name.ToLower());
+        
+        if (existingPlace != null)
+        {
+            throw new InvalidOperationException($"Место с названием '{createPlaceDto.Name}' уже существует");
+        }
+
         var place = new Place
         {
-            Name = createPlaceDto.Name,
-            Description = createPlaceDto.Description,
+            Name = createPlaceDto.Name.Trim(),
+            Description = createPlaceDto.Description ?? string.Empty,
             Address = createPlaceDto.Address,
             ImageUrl = createPlaceDto.ImageUrl,
             Latitude = createPlaceDto.Latitude,
@@ -136,7 +156,7 @@ public class PlaceService : IPlaceService
         await _context.SaveChangesAsync();
 
         // Добавляем категории
-        if (createPlaceDto.CategoryIds.Any())
+        if (createPlaceDto.CategoryIds != null && createPlaceDto.CategoryIds.Any())
         {
             foreach (var categoryId in createPlaceDto.CategoryIds)
             {

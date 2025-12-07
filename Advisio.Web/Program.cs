@@ -73,7 +73,7 @@ else
     app.UseDeveloperExceptionPage();
 }
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection(); // Отключено для работы без SSL
 app.UseStaticFiles();
 
 app.UseRouting();

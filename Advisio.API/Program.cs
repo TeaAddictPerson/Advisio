@@ -21,6 +21,26 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IExternalPlaceService, ExternalPlaceService>();
 builder.Services.AddHttpClient<IExternalPlaceService, ExternalPlaceService>();
 
+// Kufar/Kvitki Service
+builder.Services.AddHttpClient<IKufarService, KufarService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+});
+builder.Services.AddScoped<IKufarService>(sp =>
+{
+    var context = sp.GetRequiredService<AdvisioDbContext>();
+    var placeService = sp.GetRequiredService<IPlaceService>();
+    var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(IKufarService));
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    var logger = sp.GetService<ILogger<KufarService>>();
+    return new KufarService(context, placeService, httpClient, configuration, logger);
+});
+
+// Places Sync Service (Background Service)
+builder.Services.AddHostedService<PlacesSyncService>();
+builder.Services.AddScoped<IPlacesSyncService, PlacesSyncService>();
+
 // CORS
 builder.Services.AddCors(options =>
 {
@@ -41,7 +61,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection(); // Отключено для работы без SSL
 app.UseCors("AllowAll");
 app.UseAuthorization();
 app.MapControllers();

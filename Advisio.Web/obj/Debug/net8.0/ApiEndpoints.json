@@ -11,8 +11,8 @@
   },
   {
     "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "LoadKufarPlaces",
-    "RelativePath": "api/Admin/load-kufar",
+    "Method": "ClearPlacesKeepFirst7",
+    "RelativePath": "api/Admin/clear-places-keep-first-7",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
