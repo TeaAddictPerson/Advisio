@@ -2,16 +2,19 @@ using Microsoft.EntityFrameworkCore;
 using Advisio.API.Data;
 using Advisio.API.DTOs;
 using Advisio.API.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Advisio.API.Services;
 
 public class PlaceService : IPlaceService
 {
     private readonly AdvisioDbContext _context;
+    private readonly IServiceProvider _serviceProvider;
 
-    public PlaceService(AdvisioDbContext context)
+    public PlaceService(AdvisioDbContext context, IServiceProvider serviceProvider)
     {
         _context = context;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task<List<PlaceDto>> GetAllPlacesAsync(int? userId = null, string? searchQuery = null, int? categoryId = null, string? sortBy = null)
@@ -191,6 +194,23 @@ public class PlaceService : IPlaceService
         });
 
         await _context.SaveChangesAsync();
+        
+        // Асинхронно регенерируем рекомендации
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var recommendationService = scope.ServiceProvider.GetRequiredService<IRecommendationService>();
+                await recommendationService.GenerateRecommendationsAsync(userId);
+            }
+            catch (Exception ex)
+            {
+                // Логируем ошибку, но не прерываем выполнение
+                System.Diagnostics.Debug.WriteLine($"Ошибка при регенерации рекомендаций: {ex.Message}");
+            }
+        });
+        
         return true;
     }
 
@@ -203,6 +223,23 @@ public class PlaceService : IPlaceService
 
         _context.Favorites.Remove(favorite);
         await _context.SaveChangesAsync();
+        
+        // Асинхронно регенерируем рекомендации
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var recommendationService = scope.ServiceProvider.GetRequiredService<IRecommendationService>();
+                await recommendationService.GenerateRecommendationsAsync(userId);
+            }
+            catch (Exception ex)
+            {
+                // Логируем ошибку, но не прерываем выполнение
+                System.Diagnostics.Debug.WriteLine($"Ошибка при регенерации рекомендаций: {ex.Message}");
+            }
+        });
+        
         return true;
     }
 
@@ -221,6 +258,23 @@ public class PlaceService : IPlaceService
         });
 
         await _context.SaveChangesAsync();
+        
+        // Асинхронно регенерируем рекомендации
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var recommendationService = scope.ServiceProvider.GetRequiredService<IRecommendationService>();
+                await recommendationService.GenerateRecommendationsAsync(userId);
+            }
+            catch (Exception ex)
+            {
+                // Логируем ошибку, но не прерываем выполнение
+                System.Diagnostics.Debug.WriteLine($"Ошибка при регенерации рекомендаций: {ex.Message}");
+            }
+        });
+        
         return true;
     }
 
@@ -233,6 +287,23 @@ public class PlaceService : IPlaceService
 
         _context.Likes.Remove(like);
         await _context.SaveChangesAsync();
+        
+        // Асинхронно регенерируем рекомендации
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var recommendationService = scope.ServiceProvider.GetRequiredService<IRecommendationService>();
+                await recommendationService.GenerateRecommendationsAsync(userId);
+            }
+            catch (Exception ex)
+            {
+                // Логируем ошибку, но не прерываем выполнение
+                System.Diagnostics.Debug.WriteLine($"Ошибка при регенерации рекомендаций: {ex.Message}");
+            }
+        });
+        
         return true;
     }
 

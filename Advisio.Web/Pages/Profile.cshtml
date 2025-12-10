@@ -184,6 +184,32 @@
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <style>
+        /* Скрываем встроенную иконку браузера для показа/скрытия пароля */
+        input[type="password"]::-webkit-credentials-auto-fill-button {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        input[type="password"]::-ms-reveal {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        input[type="password"]::-ms-clear {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        /* Для Chrome и Edge */
+        input[type="password"]::-webkit-inner-spin-button,
+        input[type="password"]::-webkit-outer-spin-button {
+            display: none !important;
+        }
+        /* Дополнительная защита от автозаполнения */
+        input[type="password"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+    </style>
     <script>
         function togglePasswordVisibility(inputId, buttonId) {
             const input = document.getElementById(inputId);

@@ -65,7 +65,7 @@
             recommendations.forEach(rec => {
                 const place = rec.place;
                 const card = `
-                    <div class="col-md-4 mb-4">
+                    <div class="col-md-4 mb-4" id="place-card-${place.id}">
                         <div class="card h-100 border-success">
                             <div class="card-header bg-success text-white">
                                 <small>Оценка: ${rec.score.toFixed(1)}</small>
@@ -79,12 +79,12 @@
                                     ${place.categories.map(cat => `<span class="badge bg-secondary me-1">${cat}</span>`).join('')}
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <small class="text-muted">${place.likesCount} лайков</small>
+                                    <small class="text-muted" id="likes-count-${place.id}">${place.likesCount} лайков</small>
                                     <div>
-                                        <button class="btn btn-sm ${place.isFavorite ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleFavorite(${place.id})">
+                                        <button class="btn btn-sm ${place.isFavorite ? 'btn-warning' : 'btn-outline-warning'}" id="favorite-btn-${place.id}" onclick="toggleFavorite(${place.id}, ${place.isFavorite ? 'true' : 'false'})">
                                             ${place.isFavorite ? '★' : '☆'}
                                         </button>
-                                        <button class="btn btn-sm ${place.isLiked ? 'btn-danger' : 'btn-outline-danger'}" onclick="toggleLike(${place.id})">
+                                        <button class="btn btn-sm ${place.isLiked ? 'btn-danger' : 'btn-outline-danger'}" id="like-btn-${place.id}" onclick="toggleLike(${place.id}, ${place.isLiked ? 'true' : 'false'})">
                                             ${place.isLiked ? '❤️' : '🤍'}
                                         </button>
                                     </div>
@@ -98,39 +98,99 @@
             });
         }
 
-        async function toggleFavorite(placeId) {
+        async function toggleFavorite(placeId, isFavorite) {
             if (!userId) {
                 alert('Необходимо войти в систему');
                 window.location.href = '/Login';
                 return;
             }
             try {
+                // Преобразуем строку в булево значение, если нужно
+                const isFav = isFavorite === true || isFavorite === 'true';
+                const method = isFav ? 'DELETE' : 'POST';
                 const response = await fetch(`/api/places/${placeId}/favorites?userId=${userId}`, {
-                    method: 'POST'
+                    method: method
                 });
                 if (response.ok) {
-                    loadRecommendations();
+                    // Обновляем только UI конкретного места, не перезагружая все рекомендации
+                    await updatePlaceUI(placeId);
+                } else {
+                    const errorData = await response.json();
+                    console.error('Ошибка:', errorData);
                 }
             } catch (error) {
                 console.error('Ошибка:', error);
             }
         }
 
-        async function toggleLike(placeId) {
+        async function toggleLike(placeId, isLiked) {
             if (!userId) {
                 alert('Необходимо войти в систему');
                 window.location.href = '/Login';
                 return;
             }
             try {
+                // Преобразуем строку в булево значение, если нужно
+                const isLk = isLiked === true || isLiked === 'true';
+                const method = isLk ? 'DELETE' : 'POST';
                 const response = await fetch(`/api/places/${placeId}/likes?userId=${userId}`, {
-                    method: 'POST'
+                    method: method
                 });
                 if (response.ok) {
-                    loadRecommendations();
+                    // Обновляем только UI конкретного места, не перезагружая все рекомендации
+                    await updatePlaceUI(placeId);
+                } else {
+                    const errorData = await response.json();
+                    console.error('Ошибка:', errorData);
                 }
             } catch (error) {
                 console.error('Ошибка:', error);
+            }
+        }
+
+        async function updatePlaceUI(placeId) {
+            try {
+                // Получаем обновленную информацию о месте
+                const response = await fetch(`/api/places/${placeId}?userId=${userId}`);
+                if (response.ok) {
+                    const place = await response.json();
+                    
+                    // Обновляем количество лайков
+                    const likesCountElement = document.getElementById(`likes-count-${placeId}`);
+                    if (likesCountElement) {
+                        likesCountElement.textContent = `${place.likesCount} лайков`;
+                    }
+                    
+                    // Обновляем кнопку лайка
+                    const likeBtn = document.getElementById(`like-btn-${placeId}`);
+                    if (likeBtn) {
+                        if (place.isLiked) {
+                            likeBtn.className = 'btn btn-sm btn-danger';
+                            likeBtn.innerHTML = '❤️';
+                            likeBtn.setAttribute('onclick', `toggleLike(${placeId}, true)`);
+                        } else {
+                            likeBtn.className = 'btn btn-sm btn-outline-danger';
+                            likeBtn.innerHTML = '🤍';
+                            likeBtn.setAttribute('onclick', `toggleLike(${placeId}, false)`);
+                        }
+                    }
+                    
+                    // Обновляем кнопку избранного
+                    const favoriteBtn = document.getElementById(`favorite-btn-${placeId}`);
+                    if (favoriteBtn) {
+                        if (place.isFavorite) {
+                            favoriteBtn.className = 'btn btn-sm btn-warning';
+                            favoriteBtn.innerHTML = '★';
+                            favoriteBtn.setAttribute('onclick', `toggleFavorite(${placeId}, true)`);
+                        } else {
+                            favoriteBtn.className = 'btn btn-sm btn-outline-warning';
+                            favoriteBtn.innerHTML = '☆';
+                            favoriteBtn.setAttribute('onclick', `toggleFavorite(${placeId}, false)`);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка обновления UI:', error);
             }
         }
 

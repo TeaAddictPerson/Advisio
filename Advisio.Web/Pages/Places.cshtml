@@ -204,10 +204,10 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <small class="text-muted">${place.likesCount} лайков</small>
                                     <div>
-                                        <button class="btn btn-sm ${place.isFavorite ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleFavorite(${place.id})">
+                                        <button class="btn btn-sm ${place.isFavorite ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleFavorite(${place.id}, ${place.isFavorite ? 'true' : 'false'})">
                                             ${place.isFavorite ? '★' : '☆'}
                                         </button>
-                                        <button class="btn btn-sm ${place.isLiked ? 'btn-danger' : 'btn-outline-danger'}" onclick="toggleLike(${place.id})">
+                                        <button class="btn btn-sm ${place.isLiked ? 'btn-danger' : 'btn-outline-danger'}" onclick="toggleLike(${place.id}, ${place.isLiked ? 'true' : 'false'})">
                                             ${place.isLiked ? '❤️' : '🤍'}
                                         </button>
                                     </div>
@@ -221,36 +221,48 @@
             });
         }
 
-        async function toggleFavorite(placeId) {
+        async function toggleFavorite(placeId, isFavorite) {
             if (!userId) {
                 alert('Необходимо войти в систему');
                 window.location.href = '/Login';
                 return;
             }
             try {
+                // Преобразуем строку в булево значение, если нужно
+                const isFav = isFavorite === true || isFavorite === 'true';
+                const method = isFav ? 'DELETE' : 'POST';
                 const response = await fetch(`/api/places/${placeId}/favorites?userId=${userId}`, {
-                    method: 'POST'
+                    method: method
                 });
                 if (response.ok) {
                     loadPlaces();
+                } else {
+                    const errorData = await response.json();
+                    console.error('Ошибка:', errorData);
                 }
             } catch (error) {
                 console.error('Ошибка:', error);
             }
         }
 
-        async function toggleLike(placeId) {
+        async function toggleLike(placeId, isLiked) {
             if (!userId) {
                 alert('Необходимо войти в систему');
                 window.location.href = '/Login';
                 return;
             }
             try {
+                // Преобразуем строку в булево значение, если нужно
+                const isLk = isLiked === true || isLiked === 'true';
+                const method = isLk ? 'DELETE' : 'POST';
                 const response = await fetch(`/api/places/${placeId}/likes?userId=${userId}`, {
-                    method: 'POST'
+                    method: method
                 });
                 if (response.ok) {
                     loadPlaces();
+                } else {
+                    const errorData = await response.json();
+                    console.error('Ошибка:', errorData);
                 }
             } catch (error) {
                 console.error('Ошибка:', error);
