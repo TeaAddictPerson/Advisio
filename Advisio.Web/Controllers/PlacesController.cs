@@ -16,22 +16,24 @@ public class PlacesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<PlaceDto>>> GetAllPlaces(
+    public async Task<ActionResult<PagedResult<PlaceDto>>> GetAllPlaces(
         [FromQuery] int? userId = null,
         [FromQuery] string? search = null,
         [FromQuery] int? categoryId = null,
-        [FromQuery] string? sortBy = null)
+        [FromQuery] string? sortBy = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 30)
     {
         try
         {
             // Логируем параметры запроса
-            System.Diagnostics.Debug.WriteLine($"GetAllPlaces: userId={userId}, search={search}, categoryId={categoryId}, sortBy={sortBy}");
+            System.Diagnostics.Debug.WriteLine($"GetAllPlaces: userId={userId}, search={search}, categoryId={categoryId}, sortBy={sortBy}, page={page}, pageSize={pageSize}");
             
-            var places = await _placeService.GetAllPlacesAsync(userId, search, categoryId, sortBy);
+            var result = await _placeService.GetAllPlacesAsync(userId, search, categoryId, sortBy, page, pageSize);
             
-            System.Diagnostics.Debug.WriteLine($"GetAllPlaces: возвращено {places.Count} мест");
+            System.Diagnostics.Debug.WriteLine($"GetAllPlaces: возвращено {result.Items.Count} мест из {result.TotalCount} (страница {result.Page} из {result.TotalPages})");
             
-            return Ok(places);
+            return Ok(result);
         }
         catch (Exception ex)
         {

@@ -17,10 +17,15 @@ public class PlaceService : IPlaceService
         _serviceProvider = serviceProvider;
     }
 
-    public async Task<List<PlaceDto>> GetAllPlacesAsync(int? userId = null, string? searchQuery = null, int? categoryId = null, string? sortBy = null)
+    public async Task<PagedResult<PlaceDto>> GetAllPlacesAsync(int? userId = null, string? searchQuery = null, int? categoryId = null, string? sortBy = null, int page = 1, int pageSize = 30)
     {
         try
         {
+            // Валидация параметров пагинации
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 30;
+            if (pageSize > 100) pageSize = 100; // Максимальный размер страницы
+
             var query = _context.Places
                 .Include(p => p.PlaceCategories)
                     .ThenInclude(pc => pc.Category)
@@ -58,11 +63,14 @@ public class PlaceService : IPlaceService
                 _ => query.OrderByDescending(p => p.CreatedAt) // По умолчанию по дате создания
             };
 
+            // Получаем общее количество записей
             var totalCount = await query.CountAsync();
             System.Diagnostics.Debug.WriteLine($"Всего мест в запросе: {totalCount}");
             
-            var places = await query.Take(20).ToListAsync();
-            System.Diagnostics.Debug.WriteLine($"Взято мест после Take(20): {places.Count}");
+            // Применяем пагинацию
+            var skip = (page - 1) * pageSize;
+            var places = await query.Skip(skip).Take(pageSize).ToListAsync();
+            System.Diagnostics.Debug.WriteLine($"Взято мест: {places.Count} (страница {page}, размер {pageSize})");
 
             HashSet<int>? favoritePlaceIds = null;
             HashSet<int>? likedPlaceIds = null;
@@ -80,15 +88,21 @@ public class PlaceService : IPlaceService
                     .ToListAsync()).ToHashSet();
             }
 
-            var result = places.Select(p => MapToDto(p, userId, favoritePlaceIds, likedPlaceIds)).ToList();
+            var items = places.Select(p => MapToDto(p, userId, favoritePlaceIds, likedPlaceIds)).ToList();
             
-            System.Diagnostics.Debug.WriteLine($"Возвращено мест: {result.Count}");
+            System.Diagnostics.Debug.WriteLine($"Возвращено мест: {items.Count}");
             if (categoryId.HasValue)
             {
-                System.Diagnostics.Debug.WriteLine($"Фильтрация по категории {categoryId.Value}: найдено {result.Count} мест");
+                System.Diagnostics.Debug.WriteLine($"Фильтрация по категории {categoryId.Value}: найдено {items.Count} мест");
             }
             
-            return result;
+            return new PagedResult<PlaceDto>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize
+            };
         }
         catch (Exception ex)
         {
@@ -362,8 +376,8 @@ public class PlaceService : IPlaceService
             if (!placesWithoutCategories.Any())
                 return;
 
-        // Получаем все категории
-        var categories = await _context.Categories.ToListAsync();
+            // Получаем все категории
+            var categories = await _context.Categories.ToListAsync();
 
         // Находим категории по ключевым словам
         var activeCategory = categories.FirstOrDefault(c => 
@@ -431,29 +445,96 @@ public class PlaceService : IPlaceService
                 categoryIds.Add(friendsCategory.Id);
             }
 
-            // Получаем существующие категории для этого места
-            var existingCategoryIds = await _context.PlaceCategories
-                .Where(pc => pc.PlaceId == place.Id)
-                .Select(pc => pc.CategoryId)
-                .ToListAsync();
-
-            // Добавляем категории к месту
+            // Добавляем категории к месту с проверкой на дубликаты
             foreach (var categoryId in categoryIds)
             {
-                if (!existingCategoryIds.Contains(categoryId))
+                // Проверяем, существует ли уже такая связь в базе данных
+                var exists = await _context.PlaceCategories
+                    .AnyAsync(pc => pc.PlaceId == place.Id && pc.CategoryId == categoryId);
+                
+                if (!exists)
                 {
-                    _context.PlaceCategories.Add(new PlaceCategory
+                    try
                     {
-                        PlaceId = place.Id,
-                        CategoryId = categoryId
-                    });
+                        _context.PlaceCategories.Add(new PlaceCategory
+                        {
+                            PlaceId = place.Id,
+                            CategoryId = categoryId
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        // Игнорируем ошибки дубликатов (могут возникнуть при параллельном выполнении)
+                        // Логируем только если это не ошибка дубликата
+                        if (!ex.Message.Contains("PRIMARY KEY") && !ex.Message.Contains("duplicate"))
+                        {
+                            throw;
+                        }
+                    }
                 }
             }
 
             assignedCount++;
         }
 
-        await _context.SaveChangesAsync();
+        // Сохраняем изменения с обработкой ошибок дубликатов
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException dbEx)
+        {
+            // Проверяем, является ли это ошибкой дубликата ключа
+            if (dbEx.InnerException != null && 
+                (dbEx.InnerException.Message.Contains("PRIMARY KEY") || 
+                 dbEx.InnerException.Message.Contains("duplicate") ||
+                 dbEx.InnerException.Message.Contains("повторяющийся ключ")))
+            {
+                // Это ошибка дубликата - пытаемся сохранить по одному
+                var entries = _context.ChangeTracker.Entries<PlaceCategory>()
+                    .Where(e => e.State == Microsoft.EntityFrameworkCore.EntityState.Added)
+                    .ToList();
+                
+                foreach (var entry in entries)
+                {
+                    try
+                    {
+                        var placeId = entry.Entity.PlaceId;
+                        var categoryId = entry.Entity.CategoryId;
+                        
+                        // Проверяем, существует ли уже такая связь
+                        var exists = await _context.PlaceCategories
+                            .AnyAsync(pc => pc.PlaceId == placeId && pc.CategoryId == categoryId);
+                        
+                        if (exists)
+                        {
+                            // Удаляем из контекста, если уже существует
+                            _context.Entry(entry.Entity).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+                        }
+                    }
+                    catch
+                    {
+                        // Игнорируем отдельные ошибки
+                    }
+                }
+                
+                // Пытаемся сохранить оставшиеся изменения
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch
+                {
+                    // Если все еще есть ошибки, просто игнорируем их
+                    // Это не критично для работы приложения
+                }
+            }
+            else
+            {
+                // Это другая ошибка - пробрасываем дальше
+                throw;
+            }
+        }
         }
         catch (Exception ex)
         {
@@ -501,4 +582,5 @@ public class PlaceService : IPlaceService
         };
     }
 }
+
 

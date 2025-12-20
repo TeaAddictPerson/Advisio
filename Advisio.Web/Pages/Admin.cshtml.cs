@@ -7,18 +7,18 @@ namespace Advisio.Web.Pages;
 public class AdminModel : PageModel
 {
     private readonly IPlaceService _placeService;
-    private readonly IKufarService _kufarService;
+    private readonly IPredictHQService _predictHQService;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<AdminModel> _logger;
 
     public AdminModel(
         IPlaceService placeService,
-        IKufarService kufarService,
+        IPredictHQService predictHQService,
         IServiceProvider serviceProvider,
         ILogger<AdminModel> logger)
     {
         _placeService = placeService;
-        _kufarService = kufarService;
+        _predictHQService = predictHQService;
         _serviceProvider = serviceProvider;
         _logger = logger;
     }
@@ -35,16 +35,13 @@ public class AdminModel : PageModel
         try
         {
             using var scope = _serviceProvider.CreateScope();
-            var kufarService = scope.ServiceProvider.GetRequiredService<IKufarService>();
+            var predictHQService = scope.ServiceProvider.GetRequiredService<IPredictHQService>();
             var placeService = scope.ServiceProvider.GetRequiredService<IPlaceService>();
 
             Message = "Начало синхронизации...";
             
-            await kufarService.LoadPlacesFromKufarAsync();
-            Message += " Kufar загружен. ";
-            
-            await kufarService.LoadPlacesFromKvitkiAsync();
-            Message += " Kvitki загружен. ";
+            await predictHQService.LoadPlacesFromPredictHQAsync();
+            Message += " PredictHQ загружен. ";
             
             await placeService.AssignCategoriesToPlacesWithoutCategoriesAsync();
             Message += " Категории присвоены. Синхронизация завершена!";

@@ -71,32 +71,21 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
     public async Task SyncPlacesAsync()
     {
         using var scope = _serviceProvider.CreateScope();
-        var kufarService = scope.ServiceProvider.GetRequiredService<IKufarService>();
-
-        // Отключена загрузка из Kufar - используем только Kvitki.by
-        // try
-        // {
-        //     _logger.LogInformation("🔄 Загрузка мест из Kufar.by...");
-        //     await kufarService.LoadPlacesFromKufarAsync();
-        //     _logger.LogInformation("✅ Kufar.by загружен успешно");
-        // }
-        // catch (Exception ex)
-        // {
-        //     _logger.LogError(ex, "❌ ОШИБКА загрузки Kufar.by: {Error}", ex.Message);
-        // }
+        var predictHQService = scope.ServiceProvider.GetRequiredService<IPredictHQService>();
 
         try
         {
-            // Загружаем места из Kvitki.by (только билеты на развлечения)
-            _logger.LogInformation("🔄 Загрузка мест из Kvitki.by (только билеты на развлечения)...");
-            await kufarService.LoadPlacesFromKvitkiAsync();
-            _logger.LogInformation("✅ Места из Kvitki.by загружены успешно");
+            // Загружаем места из PredictHQ
+            _logger.LogInformation("🔄 Загрузка мест из PredictHQ...");
+            await predictHQService.LoadPlacesFromPredictHQAsync();
+            _logger.LogInformation("✅ Места из PredictHQ загружены успешно");
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Не удалось загрузить места из Kvitki.by. Продолжаем работу с другими источниками.");
+            _logger.LogError(ex, "❌ КРИТИЧЕСКАЯ ОШИБКА при загрузке мест из PredictHQ: {Message}", ex.Message);
+            _logger.LogError("Stack trace: {StackTrace}", ex.StackTrace);
             // Продолжаем выполнение даже если один источник не работает
-            // Это нормально, так как Kvitki API может быть недоступен или изменился
+            // Но логируем как ошибку, чтобы было видно в логах
         }
 
         try

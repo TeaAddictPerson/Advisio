@@ -43,6 +43,13 @@
     <div id="placesContainer" class="row">
         <!-- Места будут загружены через JavaScript -->
     </div>
+    
+    <!-- Пагинация -->
+    <nav aria-label="Навигация по страницам" id="paginationContainer" class="mt-4">
+        <ul class="pagination justify-content-center" id="pagination">
+            <!-- Кнопки пагинации будут добавлены через JavaScript -->
+        </ul>
+    </nav>
 </div>
 
 @section Scripts {
@@ -50,6 +57,10 @@
         let userId = null;
         let allPlaces = [];
         let searchTimeout = null;
+        let currentPage = 1;
+        let pageSize = 30;
+        let totalPages = 1;
+        let totalCount = 0;
         
         async function getUserId() {
             try {
@@ -80,8 +91,9 @@
             }
         }
         
-        async function loadPlaces() {
+        async function loadPlaces(page = 1) {
             try {
+                currentPage = page;
                 const loadingIndicator = document.getElementById('loadingIndicator');
                 const container = document.getElementById('placesContainer');
                 loadingIndicator.style.display = 'block';
@@ -112,6 +124,8 @@
                 if (sortBy) {
                     params.append('sortBy', sortBy);
                 }
+                params.append('page', page);
+                params.append('pageSize', pageSize);
                 
                 const queryString = params.toString();
                 const url = `/api/places${queryString ? '?' + queryString : ''}`;
@@ -135,18 +149,21 @@
                     }
                     throw new Error(errorMessage);
                 }
-                const places = await response.json();
-                console.log('Получено мест:', places.length);
-                allPlaces = places;
+                const result = await response.json();
+                console.log('Получено мест:', result.items.length, 'из', result.totalCount, '(страница', result.page, 'из', result.totalPages + ')');
+                
+                allPlaces = result.items;
+                totalPages = result.totalPages;
+                totalCount = result.totalCount;
+                currentPage = result.page;
                 
                 const syncButton = document.getElementById('syncButton');
-                if (places.length < 20 && syncButton) {
-                    syncButton.style.display = 'block';
-                } else if (syncButton) {
-                    syncButton.style.display = 'none';
+                if (syncButton) {
+                    syncButton.style.display = 'none'; // Скрываем кнопку синхронизации, так как теперь есть пагинация
                 }
                 
-                displayPlaces(places);
+                displayPlaces(result.items);
+                displayPagination(result);
             } catch (error) {
                 console.error('Ошибка загрузки мест:', error);
                 document.getElementById('placesContainer').innerHTML = 
@@ -160,12 +177,98 @@
             // Debounce для поиска
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
-                loadPlaces();
+                loadPlaces(1); // Сбрасываем на первую страницу при поиске
             }, 300);
         }
         
         function handleFilter() {
-            loadPlaces();
+            loadPlaces(1); // Сбрасываем на первую страницу при фильтрации
+        }
+        
+        function goToPage(page) {
+            if (page >= 1 && page <= totalPages) {
+                loadPlaces(page);
+                // Прокручиваем вверх страницы
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+        
+        function displayPagination(result) {
+            const paginationContainer = document.getElementById('pagination');
+            paginationContainer.innerHTML = '';
+            
+            if (result.totalPages <= 1) {
+                // Скрываем пагинацию, если только одна страница
+                document.getElementById('paginationContainer').style.display = 'none';
+                const infoDiv = document.getElementById('paginationInfo');
+                if (infoDiv) {
+                    infoDiv.style.display = 'none';
+                }
+                return;
+            }
+            
+            document.getElementById('paginationContainer').style.display = 'block';
+            
+            // Кнопка "Предыдущая"
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${!result.hasPreviousPage ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<a class="page-link" href="#" onclick="event.preventDefault(); goToPage(${result.page - 1}); return false;">Предыдущая</a>`;
+            paginationContainer.appendChild(prevLi);
+            
+            // Номера страниц
+            const startPage = Math.max(1, result.page - 2);
+            const endPage = Math.min(result.totalPages, result.page + 2);
+            
+            if (startPage > 1) {
+                const firstLi = document.createElement('li');
+                firstLi.className = 'page-item';
+                firstLi.innerHTML = `<a class="page-link" href="#" onclick="event.preventDefault(); goToPage(1); return false;">1</a>`;
+                paginationContainer.appendChild(firstLi);
+                
+                if (startPage > 2) {
+                    const ellipsisLi = document.createElement('li');
+                    ellipsisLi.className = 'page-item disabled';
+                    ellipsisLi.innerHTML = '<span class="page-link">...</span>';
+                    paginationContainer.appendChild(ellipsisLi);
+                }
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageLi = document.createElement('li');
+                pageLi.className = `page-item ${i === result.page ? 'active' : ''}`;
+                pageLi.innerHTML = `<a class="page-link" href="#" onclick="event.preventDefault(); goToPage(${i}); return false;">${i}</a>`;
+                paginationContainer.appendChild(pageLi);
+            }
+            
+            if (endPage < result.totalPages) {
+                if (endPage < result.totalPages - 1) {
+                    const ellipsisLi = document.createElement('li');
+                    ellipsisLi.className = 'page-item disabled';
+                    ellipsisLi.innerHTML = '<span class="page-link">...</span>';
+                    paginationContainer.appendChild(ellipsisLi);
+                }
+                
+                const lastLi = document.createElement('li');
+                lastLi.className = 'page-item';
+                lastLi.innerHTML = `<a class="page-link" href="#" onclick="event.preventDefault(); goToPage(${result.totalPages}); return false;">${result.totalPages}</a>`;
+                paginationContainer.appendChild(lastLi);
+            }
+            
+            // Кнопка "Следующая"
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${!result.hasNextPage ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<a class="page-link" href="#" onclick="event.preventDefault(); goToPage(${result.page + 1}); return false;">Следующая</a>`;
+            paginationContainer.appendChild(nextLi);
+            
+            // Информация о количестве мест
+            let infoDiv = document.getElementById('paginationInfo');
+            if (!infoDiv) {
+                infoDiv = document.createElement('div');
+                infoDiv.id = 'paginationInfo';
+                infoDiv.className = 'text-center mt-2 text-muted';
+                paginationContainer.parentElement.appendChild(infoDiv);
+            }
+            infoDiv.innerHTML = `Показано ${(result.page - 1) * result.pageSize + 1}-${Math.min(result.page * result.pageSize, result.totalCount)} из ${result.totalCount} мест`;
         }
 
         function displayPlaces(places) {
@@ -235,7 +338,7 @@
                     method: method
                 });
                 if (response.ok) {
-                    loadPlaces();
+                    loadPlaces(currentPage);
                 } else {
                     const errorData = await response.json();
                     console.error('Ошибка:', errorData);
@@ -259,7 +362,7 @@
                     method: method
                 });
                 if (response.ok) {
-                    loadPlaces();
+                    loadPlaces(currentPage);
                 } else {
                     const errorData = await response.json();
                     console.error('Ошибка:', errorData);

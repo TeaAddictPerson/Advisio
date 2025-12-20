@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Advisio.API.Services;
 using Advisio.API.Data;
 
@@ -11,16 +12,16 @@ namespace Advisio.Web.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly IPlaceService _placeService;
-    private readonly IKufarService _kufarService;
+    private readonly IPredictHQService _predictHQService;
     private readonly IServiceProvider _serviceProvider;
 
     public AdminController(
         IPlaceService placeService,
-        IKufarService kufarService,
+        IPredictHQService predictHQService,
         IServiceProvider serviceProvider)
     {
         _placeService = placeService;
-        _kufarService = kufarService;
+        _predictHQService = predictHQService;
         _serviceProvider = serviceProvider;
     }
 
@@ -45,24 +46,31 @@ public class AdminController : ControllerBase
         {
             // Создаем scope для синхронизации
             using var scope = _serviceProvider.CreateScope();
-            var kufarService = scope.ServiceProvider.GetRequiredService<IKufarService>();
+            var predictHQService = scope.ServiceProvider.GetRequiredService<IPredictHQService>();
             var placeService = scope.ServiceProvider.GetRequiredService<IPlaceService>();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<AdminController>>();
+
+            logger.LogInformation("🔄 Начало синхронизации мест из PredictHQ...");
 
             var totalBefore = await placeService.GetAllPlacesAsync();
-            var countBefore = totalBefore.Count;
+            var countBefore = totalBefore.TotalCount;
+            logger.LogInformation("📊 Количество мест до синхронизации: {Count}", countBefore);
             
-            // Отключена загрузка из Kufar - используем только Kvitki.by
-            // await kufarService.LoadPlacesFromKufarAsync();
-            
-            // Загружаем места из Kvitki.by (только билеты на развлечения)
-            await kufarService.LoadPlacesFromKvitkiAsync();
+            // Загружаем места из PredictHQ
+            logger.LogInformation("📥 Загрузка мест из PredictHQ API...");
+            await predictHQService.LoadPlacesFromPredictHQAsync();
+            logger.LogInformation("✅ Загрузка из PredictHQ завершена");
             
             // Присваиваем категории местам без категорий
+            logger.LogInformation("🏷️ Присвоение категорий местам...");
             await placeService.AssignCategoriesToPlacesWithoutCategoriesAsync();
+            logger.LogInformation("✅ Категории присвоены");
             
             var totalAfter = await placeService.GetAllPlacesAsync();
-            var countAfter = totalAfter.Count;
+            var countAfter = totalAfter.TotalCount;
             var added = countAfter - countBefore;
+
+            logger.LogInformation("✅ Синхронизация завершена. Добавлено: {Added}, Всего: {Total}", added, countAfter);
 
             return Ok(new { 
                 message = $"Синхронизация завершена. Добавлено новых мест: {added}. Всего мест в базе: {countAfter}",
@@ -72,36 +80,23 @@ public class AdminController : ControllerBase
         }
         catch (Exception ex)
         {
+            var logger = _serviceProvider.GetRequiredService<ILogger<AdminController>>();
+            logger.LogError(ex, "❌ Ошибка при синхронизации: {Error}", ex.Message);
             return StatusCode(500, new { error = $"Ошибка при синхронизации: {ex.Message}" });
         }
     }
 
-    // Отключена загрузка из Kufar - используем только Kvitki.by
-    // [HttpPost("load-kufar")]
-    // public async Task<ActionResult> LoadKufarPlaces()
-    // {
-    //     try
-    //     {
-    //         await _kufarService.LoadPlacesFromKufarAsync();
-    //         return Ok(new { message = "Места из Kufar.by успешно загружены" });
-    //     }
-    //     catch (Exception ex)
-    //     {
-    //         return StatusCode(500, new { error = $"Ошибка при загрузке мест из Kufar: {ex.Message}" });
-    //     }
-    // }
-
-    [HttpPost("load-kvitki")]
-    public async Task<ActionResult> LoadKvitkiPlaces()
+    [HttpPost("load-predicthq")]
+    public async Task<ActionResult> LoadPredictHQPlaces()
     {
         try
         {
-            await _kufarService.LoadPlacesFromKvitkiAsync();
-            return Ok(new { message = "Места из Kvitki.by успешно загружены" });
+            await _predictHQService.LoadPlacesFromPredictHQAsync();
+            return Ok(new { message = "Места из PredictHQ успешно загружены" });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { error = $"Ошибка при загрузке мест из Kvitki: {ex.Message}" });
+            return StatusCode(500, new { error = $"Ошибка при загрузке мест из PredictHQ: {ex.Message}" });
         }
     }
 

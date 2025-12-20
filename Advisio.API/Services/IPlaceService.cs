@@ -4,7 +4,7 @@ namespace Advisio.API.Services;
 
 public interface IPlaceService
 {
-    Task<List<PlaceDto>> GetAllPlacesAsync(int? userId = null, string? searchQuery = null, int? categoryId = null, string? sortBy = null);
+    Task<PagedResult<PlaceDto>> GetAllPlacesAsync(int? userId = null, string? searchQuery = null, int? categoryId = null, string? sortBy = null, int page = 1, int pageSize = 30);
     Task<PlaceDto?> GetPlaceByIdAsync(int id, int? userId = null);
     Task<PlaceDto> CreatePlaceAsync(CreatePlaceDto createPlaceDto);
     Task<bool> AddToFavoritesAsync(int userId, int placeId);

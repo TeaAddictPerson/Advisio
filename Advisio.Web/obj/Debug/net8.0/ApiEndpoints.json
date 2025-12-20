@@ -21,8 +21,8 @@
   },
   {
     "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "LoadKvitkiPlaces",
-    "RelativePath": "api/Admin/load-kvitki",
+    "Method": "LoadPredictHQPlaces",
+    "RelativePath": "api/Admin/load-predicthq",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -168,11 +168,21 @@
         "Name": "sortBy",
         "Type": "System.String",
         "IsRequired": false
+      },
+      {
+        "Name": "page",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "pageSize",
+        "Type": "System.Int32",
+        "IsRequired": false
       }
     ],
     "ReturnTypes": [
       {
-        "Type": "System.Collections.Generic.List\u00601[[Advisio.API.DTOs.PlaceDto, Advisio.API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "Type": "Advisio.API.DTOs.PagedResult\u00601[[Advisio.API.DTOs.PlaceDto, Advisio.API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
         "MediaTypes": [
           "text/plain",
           "application/json",
