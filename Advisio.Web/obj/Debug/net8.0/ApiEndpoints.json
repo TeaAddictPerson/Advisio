@@ -11,8 +11,8 @@
   },
   {
     "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "ClearPlacesKeepFirst7",
-    "RelativePath": "api/Admin/clear-places-keep-first-7",
+    "Method": "ClearPlacesKeepFirst23",
+    "RelativePath": "api/Admin/clear-places-keep-first-23",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -33,6 +33,26 @@
     "ContainingType": "Advisio.Web.Controllers.AdminController",
     "Method": "SyncPlaces",
     "RelativePath": "api/Admin/sync-places",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.AdminController",
+    "Method": "UpdateEventTypes",
+    "RelativePath": "api/Admin/update-event-types",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.AdminController",
+    "Method": "UpdateExistingPlaces",
+    "RelativePath": "api/Admin/update-existing-places",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -162,6 +182,11 @@
       {
         "Name": "categoryId",
         "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      },
+      {
+        "Name": "type",
+        "Type": "System.String",
         "IsRequired": false
       },
       {

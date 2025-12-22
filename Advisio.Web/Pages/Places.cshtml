@@ -13,15 +13,30 @@
     </div>
     
     <div class="row mb-3">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <input type="text" id="searchInput" class="form-control" placeholder="Поиск мест..." oninput="handleSearch()">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <select id="categoryFilter" class="form-select" onchange="handleFilter()">
                 <option value="">Все категории</option>
             </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
+            <select id="typeFilter" class="form-select" onchange="handleFilter()">
+                <option value="">Все типы</option>
+                <option value="Концерт">Концерт</option>
+                <option value="Ресторан">Ресторан</option>
+                <option value="Парк">Парк</option>
+                <option value="Турнир">Турнир</option>
+                <option value="Выставка">Выставка</option>
+                <option value="Фестиваль">Фестиваль</option>
+                <option value="Спектакль">Спектакль</option>
+                <option value="Кино">Кино</option>
+                <option value="Образование">Образование</option>
+                <option value="Эко тропа">Эко тропа</option>
+            </select>
+        </div>
+        <div class="col-md-3">
             <select id="sortBy" class="form-select" onchange="handleFilter()">
                 <option value="">Сортировка по умолчанию</option>
                 <option value="name">По названию (А-Я)</option>
@@ -99,9 +114,11 @@
                 loadingIndicator.style.display = 'block';
                 container.innerHTML = '';
                 
-                const searchQuery = document.getElementById('searchInput').value.trim();
-                const categoryIdValue = document.getElementById('categoryFilter').value;
-                const sortBy = document.getElementById('sortBy').value;
+                const searchQuery = document.getElementById('searchInput')?.value.trim() || '';
+                const categoryIdValue = document.getElementById('categoryFilter')?.value || '';
+                const typeFilterElement = document.getElementById('typeFilter');
+                const typeValue = typeFilterElement ? typeFilterElement.value : '';
+                const sortBy = document.getElementById('sortBy')?.value || '';
                 
                 // Формируем URL с правильными параметрами
                 const params = new URLSearchParams();
@@ -120,6 +137,11 @@
                     } else {
                         console.warn('Некорректный categoryId:', categoryIdValue);
                     }
+                }
+                
+                if (typeValue && typeValue !== '') {
+                    params.append('type', typeValue);
+                    console.log('Фильтр по типу:', typeValue);
                 }
                 if (sortBy) {
                     params.append('sortBy', sortBy);
@@ -150,20 +172,27 @@
                     throw new Error(errorMessage);
                 }
                 const result = await response.json();
-                console.log('Получено мест:', result.items.length, 'из', result.totalCount, '(страница', result.page, 'из', result.totalPages + ')');
+                // Проверяем оба варианта имени свойства (camelCase и PascalCase)
+                const items = result.items || result.Items || [];
+                const resultTotalCount = result.totalCount || result.TotalCount || 0;
+                const resultPage = result.page || result.Page || 1;
+                const resultTotalPages = result.totalPages || result.TotalPages || 1;
+                const resultPageSize = result.pageSize || result.PageSize || pageSize;
                 
-                allPlaces = result.items;
-                totalPages = result.totalPages;
-                totalCount = result.totalCount;
-                currentPage = result.page;
+                console.log('Получено мест:', items.length, 'из', resultTotalCount, '(страница', resultPage, 'из', resultTotalPages + ')');
+                
+                allPlaces = items;
+                totalPages = resultTotalPages;
+                totalCount = resultTotalCount;
+                currentPage = resultPage;
                 
                 const syncButton = document.getElementById('syncButton');
                 if (syncButton) {
                     syncButton.style.display = 'none'; // Скрываем кнопку синхронизации, так как теперь есть пагинация
                 }
                 
-                displayPlaces(result.items);
-                displayPagination(result);
+                displayPlaces(items);
+                displayPagination({ items: items, totalCount: resultTotalCount, page: resultPage, totalPages: resultTotalPages, pageSize: resultPageSize, hasPreviousPage: resultPage > 1, hasNextPage: resultPage < resultTotalPages });
             } catch (error) {
                 console.error('Ошибка загрузки мест:', error);
                 document.getElementById('placesContainer').innerHTML = 
@@ -271,16 +300,27 @@
             infoDiv.innerHTML = `Показано ${(result.page - 1) * result.pageSize + 1}-${Math.min(result.page * result.pageSize, result.totalCount)} из ${result.totalCount} мест`;
         }
 
+        function formatDescription(description) {
+            if (!description) return '';
+            // Заменяем переносы строк на <br>
+            let formatted = description.replace(/\n/g, '<br>');
+            // Заменяем <b> на <strong> для жирного текста
+            formatted = formatted.replace(/<b>/g, '<strong>').replace(/<\/b>/g, '</strong>');
+            return formatted;
+        }
+
         function displayPlaces(places) {
             const container = document.getElementById('placesContainer');
             container.innerHTML = '';
 
             if (places.length === 0) {
-                const searchQuery = document.getElementById('searchInput').value.trim();
-                const categoryId = document.getElementById('categoryFilter').value;
+                const searchQuery = document.getElementById('searchInput')?.value.trim() || '';
+                const categoryId = document.getElementById('categoryFilter')?.value || '';
+                const typeFilterElement = document.getElementById('typeFilter');
+                const type = typeFilterElement ? typeFilterElement.value : '';
                 
                 let message = 'Места не найдены';
-                if (searchQuery || categoryId) {
+                if (searchQuery || categoryId || type) {
                     message = 'По вашему запросу ничего не найдено. Попробуйте изменить параметры поиска или фильтрации.';
                 }
                 
@@ -300,10 +340,11 @@
                             ${place.imageUrl ? `<img src="${place.imageUrl}" class="card-img-top" alt="${place.name}" style="height: 200px; object-fit: cover;">` : ''}
                             <div class="card-body">
                                 <h5 class="card-title">${place.name}</h5>
-                                <p class="card-text">${place.description.substring(0, 100)}${place.description.length > 100 ? '...' : ''}</p>
                                 <div class="mb-2">
+                                    ${place.type ? `<span class="badge bg-success me-1">${place.type}</span>` : ''}
                                     ${place.categories.map(cat => `<span class="badge bg-secondary me-1">${cat}</span>`).join('')}
                                 </div>
+                                <div class="card-text place-description">${formatDescription(place.description || '')}</div>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <small class="text-muted">${place.likesCount} лайков</small>
                                     <div>

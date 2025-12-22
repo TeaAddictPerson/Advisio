@@ -41,6 +41,16 @@
             }
         }
 
+        function formatDescription(description) {
+            if (!description) return '';
+            // Заменяем переносы строк на <br>
+            let formatted = description.replace(/\n/g, '<br>');
+            // Заменяем <b> на <strong> для жирного текста
+            formatted = formatted.replace(/<b>/g, '<strong>').replace(/<\/b>/g, '</strong>');
+            // Экранируем HTML для безопасности (но оставляем наши теги)
+            return formatted;
+        }
+
         function displayPlace(place) {
             const container = document.getElementById('placeContainer');
             container.innerHTML = `
@@ -59,11 +69,12 @@
                     <div class="card-body">
                         <h1 class="card-title mb-3">${place.name}</h1>
                         <div class="mb-3">
+                            ${place.type ? `<span class="badge bg-success me-2 mb-2" style="font-size: 0.9rem;">${place.type}</span>` : ''}
                             ${place.categories.map(cat => `<span class="badge bg-primary me-2 mb-2" style="font-size: 0.9rem;">${cat}</span>`).join('')}
                         </div>
                         <div class="mb-4">
                             <h5 class="mb-3">Описание</h5>
-                            <p class="card-text" style="line-height: 1.8; font-size: 1.1rem; white-space: pre-wrap;">${place.description}</p>
+                            <div class="card-text place-description" style="line-height: 1.8; font-size: 1.1rem;">${formatDescription(place.description)}</div>
                         </div>
                         <div class="row mb-4">
                             ${place.address ? `

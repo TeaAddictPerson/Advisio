@@ -46,7 +46,7 @@ namespace Advisio.Web.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Categories", (string)null);
+                    b.ToTable("Categories");
                 });
 
             modelBuilder.Entity("Advisio.API.Models.Favorite", b =>
@@ -73,7 +73,7 @@ namespace Advisio.Web.Migrations
                     b.HasIndex("UserId", "PlaceId")
                         .IsUnique();
 
-                    b.ToTable("Favorites", (string)null);
+                    b.ToTable("Favorites");
                 });
 
             modelBuilder.Entity("Advisio.API.Models.Like", b =>
@@ -100,7 +100,7 @@ namespace Advisio.Web.Migrations
                     b.HasIndex("UserId", "PlaceId")
                         .IsUnique();
 
-                    b.ToTable("Likes", (string)null);
+                    b.ToTable("Likes");
                 });
 
             modelBuilder.Entity("Advisio.API.Models.Place", b =>
@@ -134,6 +134,9 @@ namespace Advisio.Web.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("Type")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -141,7 +144,7 @@ namespace Advisio.Web.Migrations
 
                     b.HasIndex("Name");
 
-                    b.ToTable("Places", (string)null);
+                    b.ToTable("Places");
                 });
 
             modelBuilder.Entity("Advisio.API.Models.PlaceCategory", b =>
@@ -156,7 +159,7 @@ namespace Advisio.Web.Migrations
 
                     b.HasIndex("CategoryId");
 
-                    b.ToTable("PlaceCategories", (string)null);
+                    b.ToTable("PlaceCategories");
                 });
 
             modelBuilder.Entity("Advisio.API.Models.Recommendation", b =>
@@ -192,7 +195,7 @@ namespace Advisio.Web.Migrations
                     b.HasIndex("UserId", "PlaceId")
                         .IsUnique();
 
-                    b.ToTable("Recommendations", (string)null);
+                    b.ToTable("Recommendations");
                 });
 
             modelBuilder.Entity("Advisio.API.Models.Survey", b =>
@@ -219,7 +222,7 @@ namespace Advisio.Web.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Surveys", (string)null);
+                    b.ToTable("Surveys");
                 });
 
             modelBuilder.Entity("Advisio.API.Models.SurveyAnswer", b =>
@@ -247,7 +250,7 @@ namespace Advisio.Web.Migrations
 
                     b.HasIndex("QuestionId");
 
-                    b.ToTable("SurveyAnswers", (string)null);
+                    b.ToTable("SurveyAnswers");
                 });
 
             modelBuilder.Entity("Advisio.API.Models.SurveyQuestion", b =>
@@ -275,7 +278,7 @@ namespace Advisio.Web.Migrations
 
                     b.HasIndex("SurveyId");
 
-                    b.ToTable("SurveyQuestions", (string)null);
+                    b.ToTable("SurveyQuestions");
                 });
 
             modelBuilder.Entity("Advisio.API.Models.User", b =>
@@ -312,7 +315,7 @@ namespace Advisio.Web.Migrations
                     b.HasIndex("Username")
                         .IsUnique();
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("Advisio.API.Models.UserSurveyResponse", b =>
@@ -344,7 +347,7 @@ namespace Advisio.Web.Migrations
                     b.HasIndex("UserId", "QuestionId")
                         .IsUnique();
 
-                    b.ToTable("UserSurveyResponses", (string)null);
+                    b.ToTable("UserSurveyResponses");
                 });
 
             modelBuilder.Entity("Advisio.API.Models.Favorite", b =>

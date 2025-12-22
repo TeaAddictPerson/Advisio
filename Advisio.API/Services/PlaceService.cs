@@ -17,7 +17,7 @@ public class PlaceService : IPlaceService
         _serviceProvider = serviceProvider;
     }
 
-    public async Task<PagedResult<PlaceDto>> GetAllPlacesAsync(int? userId = null, string? searchQuery = null, int? categoryId = null, string? sortBy = null, int page = 1, int pageSize = 30)
+    public async Task<PagedResult<PlaceDto>> GetAllPlacesAsync(int? userId = null, string? searchQuery = null, int? categoryId = null, string? type = null, string? sortBy = null, int page = 1, int pageSize = 30)
     {
         try
         {
@@ -48,6 +48,12 @@ public class PlaceService : IPlaceService
             {
                 query = query.Where(p => p.PlaceCategories != null && 
                                          p.PlaceCategories.Any(pc => pc.CategoryId == categoryId.Value));
+            }
+
+            // Фильтрация по типу мероприятия
+            if (!string.IsNullOrWhiteSpace(type))
+            {
+                query = query.Where(p => p.Type != null && p.Type.Equals(type, StringComparison.OrdinalIgnoreCase));
             }
 
             // Сортировка
@@ -568,6 +574,7 @@ public class PlaceService : IPlaceService
             Id = place.Id,
             Name = place.Name ?? string.Empty,
             Description = place.Description ?? string.Empty,
+            Type = place.Type,
             Address = place.Address,
             ImageUrl = place.ImageUrl,
             Latitude = place.Latitude,

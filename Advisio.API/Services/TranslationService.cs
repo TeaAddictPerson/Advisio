@@ -74,3 +74,4 @@ public class TranslationData
     public string? TranslatedText { get; set; }
 }
 
+

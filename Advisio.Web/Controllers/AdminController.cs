@@ -100,22 +100,47 @@ public class AdminController : ControllerBase
         }
     }
 
-    [HttpPost("clear-places-keep-first-7")]
-    public async Task<ActionResult> ClearPlacesKeepFirst7()
+    [HttpPost("update-existing-places")]
+    public async Task<ActionResult> UpdateExistingPlaces()
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var predictHQService = scope.ServiceProvider.GetRequiredService<IPredictHQService>();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<AdminController>>();
+
+            logger.LogInformation("🔄 Начало обновления всех существующих мест...");
+            
+            await predictHQService.UpdateExistingPlacesAsync();
+            
+            logger.LogInformation("✅ Обновление всех существующих мест завершено");
+            
+            return Ok(new { message = "Все существующие места успешно обновлены" });
+        }
+        catch (Exception ex)
+        {
+            var logger = _serviceProvider.GetRequiredService<ILogger<AdminController>>();
+            logger.LogError(ex, "❌ Ошибка при обновлении существующих мест: {Error}", ex.Message);
+            return StatusCode(500, new { error = $"Ошибка при обновлении существующих мест: {ex.Message}" });
+        }
+    }
+
+    [HttpPost("clear-places-keep-first-23")]
+    public async Task<ActionResult> ClearPlacesKeepFirst23()
     {
         try
         {
             using var scope = _serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AdvisioDbContext>();
 
-            // Получаем ID первых 7 мест
-            var first7Ids = await context.Places
+            // Получаем ID первых 23 мест
+            var first23Ids = await context.Places
                 .OrderBy(p => p.Id)
-                .Take(7)
+                .Take(23)
                 .Select(p => p.Id)
                 .ToListAsync();
 
-            if (first7Ids.Count == 0)
+            if (first23Ids.Count == 0)
             {
                 return Ok(new { message = "В базе нет мест для очистки" });
             }
@@ -124,31 +149,31 @@ public class AdminController : ControllerBase
 
             // Удаляем связи с категориями
             var placeCategoriesToDelete = await context.PlaceCategories
-                .Where(pc => !first7Ids.Contains(pc.PlaceId))
+                .Where(pc => !first23Ids.Contains(pc.PlaceId))
                 .ToListAsync();
             context.PlaceCategories.RemoveRange(placeCategoriesToDelete);
 
             // Удаляем связи с избранным
             var favoritesToDelete = await context.Favorites
-                .Where(f => !first7Ids.Contains(f.PlaceId))
+                .Where(f => !first23Ids.Contains(f.PlaceId))
                 .ToListAsync();
             context.Favorites.RemoveRange(favoritesToDelete);
 
             // Удаляем связи с лайками
             var likesToDelete = await context.Likes
-                .Where(l => !first7Ids.Contains(l.PlaceId))
+                .Where(l => !first23Ids.Contains(l.PlaceId))
                 .ToListAsync();
             context.Likes.RemoveRange(likesToDelete);
 
             // Удаляем рекомендации
             var recommendationsToDelete = await context.Recommendations
-                .Where(r => !first7Ids.Contains(r.PlaceId))
+                .Where(r => !first23Ids.Contains(r.PlaceId))
                 .ToListAsync();
             context.Recommendations.RemoveRange(recommendationsToDelete);
 
             // Удаляем места
             var placesToDelete = await context.Places
-                .Where(p => !first7Ids.Contains(p.Id))
+                .Where(p => !first23Ids.Contains(p.Id))
                 .ToListAsync();
             context.Places.RemoveRange(placesToDelete);
 
@@ -166,6 +191,31 @@ public class AdminController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { error = $"Ошибка при очистке БД: {ex.Message}" });
+        }
+    }
+
+    [HttpPost("update-event-types")]
+    public async Task<ActionResult> UpdateEventTypes()
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var predictHQService = scope.ServiceProvider.GetRequiredService<IPredictHQService>();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<AdminController>>();
+
+            logger.LogInformation("🔄 Начало обновления типов мероприятий для существующих мест...");
+            
+            await predictHQService.UpdateEventTypesForExistingPlacesAsync();
+            
+            logger.LogInformation("✅ Обновление типов мероприятий завершено");
+            
+            return Ok(new { message = "Типы мероприятий успешно обновлены для всех существующих мест" });
+        }
+        catch (Exception ex)
+        {
+            var logger = _serviceProvider.GetRequiredService<ILogger<AdminController>>();
+            logger.LogError(ex, "❌ Ошибка при обновлении типов мероприятий: {Error}", ex.Message);
+            return StatusCode(500, new { error = $"Ошибка при обновлении типов мероприятий: {ex.Message}" });
         }
     }
 }

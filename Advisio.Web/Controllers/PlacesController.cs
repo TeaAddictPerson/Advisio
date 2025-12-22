@@ -20,6 +20,7 @@ public class PlacesController : ControllerBase
         [FromQuery] int? userId = null,
         [FromQuery] string? search = null,
         [FromQuery] int? categoryId = null,
+        [FromQuery] string? type = null,
         [FromQuery] string? sortBy = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 30)
@@ -27,9 +28,9 @@ public class PlacesController : ControllerBase
         try
         {
             // Логируем параметры запроса
-            System.Diagnostics.Debug.WriteLine($"GetAllPlaces: userId={userId}, search={search}, categoryId={categoryId}, sortBy={sortBy}, page={page}, pageSize={pageSize}");
+            System.Diagnostics.Debug.WriteLine($"GetAllPlaces: userId={userId}, search={search}, categoryId={categoryId}, type={type}, sortBy={sortBy}, page={page}, pageSize={pageSize}");
             
-            var result = await _placeService.GetAllPlacesAsync(userId, search, categoryId, sortBy, page, pageSize);
+            var result = await _placeService.GetAllPlacesAsync(userId, search, categoryId, type, sortBy, page, pageSize);
             
             System.Diagnostics.Debug.WriteLine($"GetAllPlaces: возвращено {result.Items.Count} мест из {result.TotalCount} (страница {result.Page} из {result.TotalPages})");
             
