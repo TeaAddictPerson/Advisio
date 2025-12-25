@@ -172,6 +172,7 @@ public class PlaceService : IPlaceService
             ImageUrl = createPlaceDto.ImageUrl,
             Latitude = createPlaceDto.Latitude,
             Longitude = createPlaceDto.Longitude,
+            Type = createPlaceDto.Type,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -587,6 +588,81 @@ public class PlaceService : IPlaceService
             IsLiked = isLiked,
             LikesCount = place.Likes?.Count ?? 0
         };
+    }
+
+    public async Task<PlaceDto> UpdatePlaceAsync(int id, UpdatePlaceDto updatePlaceDto)
+    {
+        var place = await _context.Places
+            .Include(p => p.PlaceCategories)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (place == null)
+        {
+            throw new ArgumentException($"Место с ID {id} не найдено");
+        }
+
+        // Обновляем основные поля
+        place.Name = updatePlaceDto.Name.Trim();
+        place.Description = updatePlaceDto.Description ?? string.Empty;
+        place.Address = updatePlaceDto.Address;
+        place.ImageUrl = updatePlaceDto.ImageUrl;
+        place.Latitude = updatePlaceDto.Latitude;
+        place.Longitude = updatePlaceDto.Longitude;
+        place.Type = updatePlaceDto.Type;
+        place.UpdatedAt = DateTime.UtcNow;
+
+        // Обновляем категории
+        if (updatePlaceDto.CategoryIds != null)
+        {
+            // Удаляем старые категории
+            var oldCategories = place.PlaceCategories.ToList();
+            _context.PlaceCategories.RemoveRange(oldCategories);
+
+            // Добавляем новые категории
+            foreach (var categoryId in updatePlaceDto.CategoryIds)
+            {
+                var categoryExists = await _context.Categories.AnyAsync(c => c.Id == categoryId);
+                if (categoryExists)
+                {
+                    _context.PlaceCategories.Add(new PlaceCategory
+                    {
+                        PlaceId = place.Id,
+                        CategoryId = categoryId
+                    });
+                }
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        return await GetPlaceByIdAsync(place.Id) ?? throw new Exception("Место не найдено после обновления");
+    }
+
+    public async Task<bool> DeletePlaceAsync(int id)
+    {
+        var place = await _context.Places
+            .Include(p => p.PlaceCategories)
+            .Include(p => p.Favorites)
+            .Include(p => p.Likes)
+            .Include(p => p.Recommendations)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (place == null)
+        {
+            return false;
+        }
+
+        // Удаляем все связи
+        _context.PlaceCategories.RemoveRange(place.PlaceCategories);
+        _context.Favorites.RemoveRange(place.Favorites);
+        _context.Likes.RemoveRange(place.Likes);
+        _context.Recommendations.RemoveRange(place.Recommendations);
+
+        // Удаляем само место
+        _context.Places.Remove(place);
+        await _context.SaveChangesAsync();
+
+        return true;
     }
 }
 

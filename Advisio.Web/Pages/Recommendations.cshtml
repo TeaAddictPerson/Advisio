@@ -44,7 +44,7 @@
                 const recommendations = await response.json();
                 if (!recommendations || recommendations.length === 0) {
                     container.innerHTML = 
-                        '<div class="col-12"><div class="alert alert-info"><h5>Рекомендации не найдены</h5><p>Пройдите опрос для получения персональных рекомендаций.</p><a href="/Survey" class="btn btn-primary">Пройти опрос</a></div></div>';
+                        '<div class="col-12"><div class="alert alert-info"><h5>Недостаточно информации для создания ваших рекомендаций</h5><p>Для получения персональных рекомендаций необходимо:</p><ul class="mb-3"><li>Лайкнуть несколько мест</li><li>Добавить места в избранное</li><li>Пройдите опрос</li></ul><div class="d-flex gap-2"><a href="/Places" class="btn btn-primary">Посмотреть места</a><a href="/Survey" class="btn btn-secondary">Пройти опрос</a></div></div></div>';
                     return;
                 }
                 displayRecommendations(recommendations);
@@ -63,9 +63,17 @@
                 container.innerHTML = `
                     <div class="col-12">
                         <div class="alert alert-info">
-                            <h5>Рекомендации не найдены</h5>
-                            <p>Пройдите опрос для получения персональных рекомендаций.</p>
-                            <a href="/Survey" class="btn btn-primary">Пройти опрос</a>
+                            <h5>Недостаточно информации для создания ваших рекомендаций</h5>
+                            <p>Для получения персональных рекомендаций необходимо:</p>
+                            <ul class="mb-3">
+                                <li>Лайкнуть несколько мест</li>
+                                <li>Добавить места в избранное</li>
+                                <li>Пройдите опрос</li>
+                            </ul>
+                            <div class="d-flex gap-2">
+                                <a href="/Places" class="btn btn-primary">Посмотреть места</a>
+                                <a href="/Survey" class="btn btn-secondary">Пройти опрос</a>
+                            </div>
                         </div>
                     </div>
                 `;

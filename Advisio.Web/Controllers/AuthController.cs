@@ -70,6 +70,7 @@ public class AuthController : ControllerBase
     {
         var userId = HttpContext.Session.GetInt32("UserId");
         var username = HttpContext.Session.GetString("Username");
+        var role = HttpContext.Session.GetString("Role");
 
         if (userId == null)
         {
@@ -80,7 +81,8 @@ public class AuthController : ControllerBase
         {
             isAuthenticated = true,
             userId = userId,
-            username = username
+            username = username,
+            role = role
         });
     }
 }

@@ -26,8 +26,17 @@ public class AdminModel : PageModel
     public string? Message { get; set; }
     public string? ErrorMessage { get; set; }
 
-    public void OnGet()
+    public IActionResult OnGet()
     {
+        var userId = HttpContext.Session.GetInt32("UserId");
+        var role = HttpContext.Session.GetString("Role");
+
+        if (userId == null || role != "Admin")
+        {
+            return RedirectToPage("/Login");
+        }
+
+        return Page();
     }
 
     public async Task<IActionResult> OnPostSyncPlacesAsync()
@@ -58,6 +67,14 @@ public class AdminModel : PageModel
 
     public async Task<IActionResult> OnPostAssignCategoriesAsync()
     {
+        var userId = HttpContext.Session.GetInt32("UserId");
+        var role = HttpContext.Session.GetString("Role");
+
+        if (userId == null || role != "Admin")
+        {
+            return RedirectToPage("/Login");
+        }
+
         try
         {
             await _placeService.AssignCategoriesToPlacesWithoutCategoriesAsync();

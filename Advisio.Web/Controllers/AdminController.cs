@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Advisio.API.Services;
 using Advisio.API.Data;
+using Advisio.API.DTOs;
+using Advisio.API.Models;
 
 namespace Advisio.Web.Controllers;
 
@@ -218,4 +220,195 @@ public class AdminController : ControllerBase
             return StatusCode(500, new { error = $"Ошибка при обновлении типов мероприятий: {ex.Message}" });
         }
     }
+
+    private bool IsAdmin()
+    {
+        var role = HttpContext.Session.GetString("Role");
+        return role == "Admin";
+    }
+
+    [HttpPost("places")]
+    public async Task<ActionResult<PlaceDto>> CreatePlace([FromBody] CreatePlaceDto createPlaceDto)
+    {
+        if (!IsAdmin())
+        {
+            return Unauthorized(new { error = "Требуются права администратора" });
+        }
+
+        try
+        {
+            var place = await _placeService.CreatePlaceAsync(createPlaceDto);
+            return Ok(place);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = $"Ошибка при создании места: {ex.Message}" });
+        }
+    }
+
+    [HttpPut("places/{id}")]
+    public async Task<ActionResult<PlaceDto>> UpdatePlace(int id, [FromBody] UpdatePlaceDto updatePlaceDto)
+    {
+        if (!IsAdmin())
+        {
+            return Unauthorized(new { error = "Требуются права администратора" });
+        }
+
+        try
+        {
+            var place = await _placeService.UpdatePlaceAsync(id, updatePlaceDto);
+            return Ok(place);
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = $"Ошибка при обновлении места: {ex.Message}" });
+        }
+    }
+
+    [HttpDelete("places/{id}")]
+    public async Task<ActionResult> DeletePlace(int id)
+    {
+        if (!IsAdmin())
+        {
+            return Unauthorized(new { error = "Требуются права администратора" });
+        }
+
+        try
+        {
+            var deleted = await _placeService.DeletePlaceAsync(id);
+            if (deleted)
+            {
+                return Ok(new { message = "Место успешно удалено" });
+            }
+            return NotFound(new { error = "Место не найдено" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = $"Ошибка при удалении места: {ex.Message}" });
+        }
+    }
+
+    [HttpPost("survey/add-question")]
+    public async Task<ActionResult> AddQuestion([FromBody] AddQuestionDto addQuestionDto)
+    {
+        if (!IsAdmin())
+        {
+            return Unauthorized(new { error = "Требуются права администратора" });
+        }
+
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AdvisioDbContext>();
+            var surveyService = scope.ServiceProvider.GetRequiredService<ISurveyService>();
+
+            // Получаем активный опрос или создаем новый
+            var activeSurvey = await context.Surveys
+                .Where(s => s.IsActive)
+                .FirstOrDefaultAsync();
+
+            if (activeSurvey == null)
+            {
+                activeSurvey = new Survey
+                {
+                    Title = "Основной опрос",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+                context.Surveys.Add(activeSurvey);
+                await context.SaveChangesAsync();
+            }
+
+            // Создаем вопрос
+            var question = new SurveyQuestion
+            {
+                SurveyId = activeSurvey.Id,
+                QuestionText = addQuestionDto.QuestionText,
+                Order = addQuestionDto.Order,
+                CreatedAt = DateTime.UtcNow
+            };
+            context.SurveyQuestions.Add(question);
+            await context.SaveChangesAsync();
+
+            // Создаем ответы
+            foreach (var answerDto in addQuestionDto.Answers)
+            {
+                var answer = new SurveyAnswer
+                {
+                    QuestionId = question.Id,
+                    AnswerText = answerDto.AnswerText,
+                    Weight = answerDto.Weight,
+                    CreatedAt = DateTime.UtcNow
+                };
+                context.SurveyAnswers.Add(answer);
+            }
+            await context.SaveChangesAsync();
+
+            return Ok(new { message = "Вопрос успешно добавлен", questionId = question.Id });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = $"Ошибка при добавлении вопроса: {ex.Message}" });
+        }
+    }
+
+    [HttpDelete("survey/delete-question/{id}")]
+    public async Task<ActionResult> DeleteQuestion(int id)
+    {
+        if (!IsAdmin())
+        {
+            return Unauthorized(new { error = "Требуются права администратора" });
+        }
+
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AdvisioDbContext>();
+
+            var question = await context.SurveyQuestions
+                .Include(q => q.Answers)
+                .FirstOrDefaultAsync(q => q.Id == id);
+
+            if (question == null)
+            {
+                return NotFound(new { error = "Вопрос не найден" });
+            }
+
+            // Удаляем ответы
+            context.SurveyAnswers.RemoveRange(question.Answers);
+
+            // Удаляем ответы пользователей на этот вопрос
+            var userResponses = await context.UserSurveyResponses
+                .Where(r => r.Answer.QuestionId == id)
+                .ToListAsync();
+            context.UserSurveyResponses.RemoveRange(userResponses);
+
+            // Удаляем вопрос
+            context.SurveyQuestions.Remove(question);
+            await context.SaveChangesAsync();
+
+            return Ok(new { message = "Вопрос успешно удален" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = $"Ошибка при удалении вопроса: {ex.Message}" });
+        }
+    }
+}
+
+public class AddQuestionDto
+{
+    public string QuestionText { get; set; } = string.Empty;
+    public int Order { get; set; }
+    public List<AddAnswerDto> Answers { get; set; } = new();
+}
+
+public class AddAnswerDto
+{
+    public string AnswerText { get; set; } = string.Empty;
+    public int Weight { get; set; }
 }

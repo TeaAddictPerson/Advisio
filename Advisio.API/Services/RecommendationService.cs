@@ -23,6 +23,17 @@ public class RecommendationService : IRecommendationService
 
     public async Task<List<RecommendationDto>> GetRecommendationsAsync(int userId, int count = 20)
     {
+        // Проверяем, есть ли у пользователя данные для генерации рекомендаций
+        var hasLikes = await _context.Likes.AnyAsync(l => l.UserId == userId);
+        var hasFavorites = await _context.Favorites.AnyAsync(f => f.UserId == userId);
+        var hasCompletedSurvey = await _surveyService.HasUserCompletedSurveyAsync(userId);
+        
+        // Если у пользователя нет лайков, избранных и не пройден опрос, возвращаем пустой список
+        if (!hasLikes && !hasFavorites && !hasCompletedSurvey)
+        {
+            return new List<RecommendationDto>();
+        }
+
         // Проверяем, есть ли рекомендации для пользователя
         var existingRecommendations = await _context.Recommendations
             .Where(r => r.UserId == userId)
@@ -67,19 +78,13 @@ public class RecommendationService : IRecommendationService
                 .DefaultIfEmpty(DateTime.MinValue)
                 .Max();
 
-            // Проверяем, есть ли у пользователя лайки или избранные
-            var hasLikesOrFavorites = await _context.Likes
-                .AnyAsync(l => l.UserId == userId) || 
-                await _context.Favorites
-                .AnyAsync(f => f.UserId == userId);
-
             // Если были изменения после генерации рекомендаций, регенерируем
             if (lastChange > oldestRecommendationTime)
             {
                 shouldRegenerate = true;
             }
             // Если у пользователя нет лайков и избранных, но рекомендации есть - регенерируем
-            else if (!hasLikesOrFavorites && existingRecommendations.Any())
+            else if (!hasLikes && !hasFavorites && existingRecommendations.Any())
             {
                 shouldRegenerate = true;
             }
@@ -90,8 +95,8 @@ public class RecommendationService : IRecommendationService
             }
         }
 
-        // Если рекомендаций меньше 15, регенерируем
-        if (existingRecommendations.Count < 15)
+        // Если рекомендаций меньше 15, регенерируем (только если есть данные для генерации)
+        if (existingRecommendations.Count < 15 && (hasLikes || hasFavorites || hasCompletedSurvey))
         {
             shouldRegenerate = true;
         }

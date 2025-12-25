@@ -138,3 +138,4 @@ D:\CodingStuff\Advisio\Advisio.API\obj\Debug\net8.0\rjsmrazor.dswa.cache.json
 D:\CodingStuff\Advisio\Advisio.API\obj\Debug\net8.0\rjsmcshtml.dswa.cache.json
 D:\CodingStuff\Advisio\Advisio.API\obj\Debug\net8.0\staticwebassets.build.json.cache
 D:\CodingStuff\Advisio\Advisio.API\obj\Debug\net8.0\staticwebassets.build.endpoints.json
+D:\CodingStuff\Advisio\Advisio.API\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt

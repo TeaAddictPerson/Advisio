@@ -43,6 +43,7 @@ public class AuthService : IAuthService
             Username = username,
             Email = email,
             PasswordHash = HashPassword(password),
+            Role = email.ToLower() == "admin@gmail.com" ? UserRole.Admin : UserRole.User,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -58,6 +59,7 @@ public class AuthService : IAuthService
                 Id = user.Id,
                 Username = user.Username,
                 Email = user.Email,
+                Role = user.Role,
                 CreatedAt = user.CreatedAt
             }
         };
@@ -65,6 +67,42 @@ public class AuthService : IAuthService
 
     public async Task<AuthResultDto> LoginAsync(string email, string password)
     {
+        // Создаем админа автоматически, если его нет
+        if (email.ToLower() == "admin@gmail.com" && password == "admin123")
+        {
+            var existingAdmin = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == "admin@gmail.com");
+            
+            if (existingAdmin == null)
+            {
+                // Создаем админа
+                var admin = new User
+                {
+                    Username = "Admin",
+                    Email = "admin@gmail.com",
+                    PasswordHash = HashPassword("admin123"),
+                    Role = UserRole.Admin,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.Users.Add(admin);
+                await _context.SaveChangesAsync();
+                
+                return new AuthResultDto
+                {
+                    Success = true,
+                    Message = "Вход выполнен успешно",
+                    User = new UserDto
+                    {
+                        Id = admin.Id,
+                        Username = admin.Username,
+                        Email = admin.Email,
+                        Role = admin.Role,
+                        CreatedAt = admin.CreatedAt
+                    }
+                };
+            }
+        }
+
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email == email);
 
@@ -77,6 +115,13 @@ public class AuthService : IAuthService
             };
         }
 
+        // Если это admin@gmail.com, убеждаемся что роль установлена как Admin
+        if (user.Email.ToLower() == "admin@gmail.com" && user.Role != UserRole.Admin)
+        {
+            user.Role = UserRole.Admin;
+            await _context.SaveChangesAsync();
+        }
+
         return new AuthResultDto
         {
             Success = true,
@@ -86,6 +131,7 @@ public class AuthService : IAuthService
                 Id = user.Id,
                 Username = user.Username,
                 Email = user.Email,
+                Role = user.Role,
                 CreatedAt = user.CreatedAt
             }
         };
@@ -181,6 +227,7 @@ public class AuthService : IAuthService
                 Id = user.Id,
                 Username = user.Username,
                 Email = user.Email,
+                Role = user.Role,
                 CreatedAt = user.CreatedAt
             }
         };

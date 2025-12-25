@@ -24,6 +24,19 @@ public class CreatePlaceDto
     public string? ImageUrl { get; set; }
     public decimal? Latitude { get; set; }
     public decimal? Longitude { get; set; }
+    public string? Type { get; set; }
+    public List<int> CategoryIds { get; set; } = new();
+}
+
+public class UpdatePlaceDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string? Address { get; set; }
+    public string? ImageUrl { get; set; }
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
+    public string? Type { get; set; }
     public List<int> CategoryIds { get; set; } = new();
 }
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Advisio.API.Services;
 using Advisio.API.DTOs;
+using Advisio.API.Models;
 
 namespace Advisio.Web.Pages;
 
@@ -47,6 +48,13 @@ public class RegisterModel : PageModel
         // Сохраняем ID пользователя в сессии
         HttpContext.Session.SetInt32("UserId", result.User!.Id);
         HttpContext.Session.SetString("Username", result.User.Username);
+        HttpContext.Session.SetString("Role", result.User.Role.ToString());
+
+        // Если админ, перенаправляем на админскую панель
+        if (result.User.Role == UserRole.Admin)
+        {
+            return RedirectToPage("/Admin");
+        }
 
         return RedirectToPage("/Profile");
     }

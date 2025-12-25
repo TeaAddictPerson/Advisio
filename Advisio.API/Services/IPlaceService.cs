@@ -14,5 +14,7 @@ public interface IPlaceService
     Task<List<PlaceDto>> GetFavoritePlacesAsync(int userId);
     Task<List<PlaceDto>> GetLikedPlacesAsync(int userId);
     Task AssignCategoriesToPlacesWithoutCategoriesAsync();
+    Task<PlaceDto> UpdatePlaceAsync(int id, UpdatePlaceDto updatePlaceDto);
+    Task<bool> DeletePlaceAsync(int id);
 }
 
