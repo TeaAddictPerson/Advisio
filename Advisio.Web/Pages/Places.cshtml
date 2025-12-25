@@ -111,6 +111,12 @@
                 currentPage = page;
                 const loadingIndicator = document.getElementById('loadingIndicator');
                 const container = document.getElementById('placesContainer');
+                
+                if (!loadingIndicator || !container) {
+                    console.error('Не найдены элементы DOM для загрузки мест');
+                    return;
+                }
+                
                 loadingIndicator.style.display = 'block';
                 container.innerHTML = '';
                 
@@ -122,6 +128,15 @@
                 
                 // Формируем URL с правильными параметрами
                 const params = new URLSearchParams();
+                
+                // Пытаемся получить userId, если его еще нет
+                if (!userId) {
+                    try {
+                        await getUserId();
+                    } catch (e) {
+                        console.warn('Не удалось получить userId, продолжаем без него:', e);
+                    }
+                }
                 
                 if (userId) {
                     params.append('userId', userId);
@@ -470,12 +485,18 @@
 
         (async () => {
             try {
-                await getUserId();
-                await loadCategories();
+                // Загружаем данные параллельно, не ждем userId
+                await Promise.all([
+                    getUserId().catch(err => console.warn('Ошибка получения userId:', err)),
+                    loadCategories().catch(err => console.error('Ошибка загрузки категорий:', err))
+                ]);
                 assignCategoriesIfNeeded().catch(err => console.warn('Фоновая задача присвоения категорий:', err));
+                // Загружаем места независимо от userId
                 loadPlaces();
             } catch (error) {
                 console.error('Ошибка инициализации:', error);
+                // Все равно пытаемся загрузить места
+                loadPlaces();
             }
         })();
     </script>

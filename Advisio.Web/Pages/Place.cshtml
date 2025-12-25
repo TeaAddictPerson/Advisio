@@ -26,18 +26,43 @@
         }
 
         async function loadPlace() {
+            const container = document.getElementById('placeContainer');
+            if (!container) {
+                console.error('Контейнер для места не найден');
+                return;
+            }
+            
             try {
+                // Пытаемся получить userId, если его еще нет
+                if (!userId) {
+                    try {
+                        await getUserId();
+                    } catch (e) {
+                        console.warn('Не удалось получить userId, продолжаем без него:', e);
+                    }
+                }
+                
+                container.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Загрузка...</span></div></div>';
+                
                 const url = userId ? `/api/places/${placeId}?userId=${userId}` : `/api/places/${placeId}`;
                 const response = await fetch(url);
+                
                 if (response.status === 404) {
-                    document.getElementById('placeContainer').innerHTML = 
+                    container.innerHTML = 
                         '<div class="alert alert-warning">Место не найдено</div>';
                     return;
                 }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const place = await response.json();
                 displayPlace(place);
             } catch (error) {
                 console.error('Ошибка загрузки места:', error);
+                container.innerHTML = 
+                    '<div class="alert alert-danger">Ошибка загрузки места. Попробуйте обновить страницу.</div>';
             }
         }
 
@@ -163,8 +188,14 @@
         }
 
         (async () => {
-            await getUserId();
-            loadPlace();
+            try {
+                await getUserId();
+                loadPlace();
+            } catch (error) {
+                console.error('Ошибка инициализации:', error);
+                // Все равно пытаемся загрузить место
+                loadPlace();
+            }
         })();
     </script>
 }

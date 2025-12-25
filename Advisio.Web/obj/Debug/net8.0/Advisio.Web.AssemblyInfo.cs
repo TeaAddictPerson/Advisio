@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Advisio.Web")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a744d984e90af779bf3e385ed0d3fe2fc6852057")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2d8423c319676fb7f77baa1dd2df93153f02db61")]
 [assembly: System.Reflection.AssemblyProductAttribute("Advisio.Web")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Advisio.Web")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -26,12 +26,12 @@ public class SurveyController : ControllerBase
     }
 
     [HttpPost("submit")]
-    public async Task<ActionResult> SubmitSurvey([FromQuery] int userId, [FromBody] SubmitSurveyDto submitSurveyDto)
+    public async Task<ActionResult<SurveyResultDto>> SubmitSurvey([FromQuery] int userId, [FromBody] SubmitSurveyDto submitSurveyDto)
     {
         try
         {
-            await _surveyService.SubmitSurveyAsync(userId, submitSurveyDto);
-            return Ok(new { message = "Опрос успешно отправлен" });
+            var result = await _surveyService.SubmitSurveyAsync(userId, submitSurveyDto);
+            return Ok(result);
         }
         catch (ArgumentException ex)
         {

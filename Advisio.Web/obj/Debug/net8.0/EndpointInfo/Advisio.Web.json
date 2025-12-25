@@ -521,7 +521,7 @@
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 9
+              "default": 20
             }
           }
         ],
@@ -676,7 +676,24 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyResultDto"
+                }
+              }
+            }
           }
         }
       }
@@ -1090,6 +1107,24 @@
             "items": {
               "$ref": "#/components/schemas/SurveyAnswerDto"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SurveyResultDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "favoriteCategoryId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "favoriteCategoryName": {
+            "type": "string",
             "nullable": true
           }
         },
