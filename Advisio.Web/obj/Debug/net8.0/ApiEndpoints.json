@@ -11,153 +11,18 @@
   },
   {
     "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "ClearPlacesKeepFirst23",
-    "RelativePath": "api/Admin/clear-places-keep-first-23",
+    "Method": "ClearPlacesKeepFirst7",
+    "RelativePath": "api/Admin/clear-places-keep-first-7",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
     "Parameters": [],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "LoadPredictHQPlaces",
-    "RelativePath": "api/Admin/load-predicthq",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "CreatePlace",
-    "RelativePath": "api/Admin/places",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "createPlaceDto",
-        "Type": "Advisio.API.DTOs.CreatePlaceDto",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "Advisio.API.DTOs.PlaceDto",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "UpdatePlace",
-    "RelativePath": "api/Admin/places/{id}",
-    "HttpMethod": "PUT",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "id",
-        "Type": "System.Int32",
-        "IsRequired": true
-      },
-      {
-        "Name": "updatePlaceDto",
-        "Type": "Advisio.API.DTOs.UpdatePlaceDto",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "Advisio.API.DTOs.PlaceDto",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "DeletePlace",
-    "RelativePath": "api/Admin/places/{id}",
-    "HttpMethod": "DELETE",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "id",
-        "Type": "System.Int32",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "AddQuestion",
-    "RelativePath": "api/Admin/survey/add-question",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "addQuestionDto",
-        "Type": "Advisio.Web.Controllers.AddQuestionDto",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "DeleteQuestion",
-    "RelativePath": "api/Admin/survey/delete-question/{id}",
-    "HttpMethod": "DELETE",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "id",
-        "Type": "System.Int32",
-        "IsRequired": true
-      }
-    ],
     "ReturnTypes": []
   },
   {
     "ContainingType": "Advisio.Web.Controllers.AdminController",
     "Method": "SyncPlaces",
     "RelativePath": "api/Admin/sync-places",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "UpdateEventTypes",
-    "RelativePath": "api/Admin/update-event-types",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "Advisio.Web.Controllers.AdminController",
-    "Method": "UpdateExistingPlaces",
-    "RelativePath": "api/Admin/update-existing-places",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -183,7 +48,7 @@
     "Order": 0,
     "Parameters": [
       {
-        "Name": "loginDto",
+        "Name": "dto",
         "Type": "Advisio.API.DTOs.LoginDto",
         "IsRequired": true
       }
@@ -212,6 +77,32 @@
   },
   {
     "ContainingType": "Advisio.Web.Controllers.AuthController",
+    "Method": "UpdateProfile",
+    "RelativePath": "api/Auth/profile",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "dto",
+        "Type": "Advisio.API.DTOs.UpdateProfileDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "Advisio.API.DTOs.AuthResultDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.AuthController",
     "Method": "Register",
     "RelativePath": "api/Auth/register",
     "HttpMethod": "POST",
@@ -219,7 +110,7 @@
     "Order": 0,
     "Parameters": [
       {
-        "Name": "registerDto",
+        "Name": "dto",
         "Type": "Advisio.API.DTOs.RegisterDto",
         "IsRequired": true
       }
@@ -355,6 +246,53 @@
   },
   {
     "ContainingType": "Advisio.Web.Controllers.PlacesController",
+    "Method": "UpdatePlace",
+    "RelativePath": "api/Places/{id}",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "dto",
+        "Type": "Advisio.API.DTOs.UpdatePlaceDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "Advisio.API.DTOs.PlaceDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.PlacesController",
+    "Method": "DeletePlace",
+    "RelativePath": "api/Places/{id}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.PlacesController",
     "Method": "AddToFavorites",
     "RelativePath": "api/Places/{placeId}/favorites",
     "HttpMethod": "POST",
@@ -436,6 +374,58 @@
       }
     ],
     "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.PlacesController",
+    "Method": "GetFavoritePlaces",
+    "RelativePath": "api/Places/favorites/{userId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[Advisio.API.DTOs.PlaceDto, Advisio.API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.PlacesController",
+    "Method": "GetLikedPlaces",
+    "RelativePath": "api/Places/liked/{userId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[Advisio.API.DTOs.PlaceDto, Advisio.API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "Advisio.Web.Controllers.RecommendationsController",
@@ -527,6 +517,59 @@
   },
   {
     "ContainingType": "Advisio.Web.Controllers.SurveyController",
+    "Method": "CreateAnswer",
+    "RelativePath": "api/Survey/answers",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "dto",
+        "Type": "Advisio.Web.Controllers.CreateAnswerDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.SurveyController",
+    "Method": "DeleteAnswer",
+    "RelativePath": "api/Survey/answers/{answerId}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "answerId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.SurveyController",
+    "Method": "UpdateAnswer",
+    "RelativePath": "api/Survey/answers/{answerId}",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "answerId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "dto",
+        "Type": "Advisio.Web.Controllers.UpdateAnswerDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.SurveyController",
     "Method": "HasCompletedSurvey",
     "RelativePath": "api/Survey/completed",
     "HttpMethod": "GET",
@@ -553,6 +596,59 @@
   },
   {
     "ContainingType": "Advisio.Web.Controllers.SurveyController",
+    "Method": "CreateQuestion",
+    "RelativePath": "api/Survey/questions",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "dto",
+        "Type": "Advisio.Web.Controllers.CreateQuestionDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.SurveyController",
+    "Method": "DeleteQuestion",
+    "RelativePath": "api/Survey/questions/{questionId}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "questionId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.SurveyController",
+    "Method": "UpdateQuestion",
+    "RelativePath": "api/Survey/questions/{questionId}",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "questionId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "dto",
+        "Type": "Advisio.Web.Controllers.UpdateQuestionDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Advisio.Web.Controllers.SurveyController",
     "Method": "SubmitSurvey",
     "RelativePath": "api/Survey/submit",
     "HttpMethod": "POST",
@@ -570,17 +666,7 @@
         "IsRequired": true
       }
     ],
-    "ReturnTypes": [
-      {
-        "Type": "Advisio.API.DTOs.SurveyResultDto",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
+    "ReturnTypes": []
   },
   {
     "ContainingType": "Advisio.Web.Controllers.UsersController",

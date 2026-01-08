@@ -97,5 +97,47 @@ public class PlacesController : ControllerBase
 
         return Ok(new { message = "Лайк удален" });
     }
+
+    [HttpGet("favorites/{userId}")]
+    public async Task<ActionResult<List<PlaceDto>>> GetFavoritePlaces(int userId)
+    {
+        var favorites = await _placeService.GetFavoritePlacesAsync(userId);
+        return Ok(favorites);
+    }
+
+    [HttpGet("liked/{userId}")]
+    public async Task<ActionResult<List<PlaceDto>>> GetLikedPlaces(int userId)
+    {
+        var liked = await _placeService.GetLikedPlacesAsync(userId);
+        return Ok(liked);
+    }
+
+    [HttpPut("{id}")]
+    public async Task<ActionResult<PlaceDto>> UpdatePlace(int id, [FromBody] UpdatePlaceDto dto)
+    {
+        try
+        {
+            var place = await _placeService.UpdatePlaceAsync(id, dto);
+            return Ok(place);
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> DeletePlace(int id)
+    {
+        var result = await _placeService.DeletePlaceAsync(id);
+        if (!result)
+            return NotFound("Место не найдено");
+
+        return Ok(new { message = "Место удалено" });
+    }
 }
 

@@ -7,6 +7,9 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>Места отдыха</h1>
+        <button class="btn btn-outline-primary" onclick="syncPlaces()" id="syncButton">
+            <i class="bi bi-arrow-clockwise"></i> Загрузить больше мест
+        </button>
     </div>
     
     <div class="row mb-3">
@@ -67,7 +70,6 @@
 @section Scripts {
     <script>
         let userId = null;
-        let userRole = null;
         let allPlaces = [];
         let searchTimeout = null;
         let currentPage = 1;
@@ -81,15 +83,10 @@
                 const data = await response.json();
                 if (data.isAuthenticated) {
                     userId = data.userId;
-                    userRole = data.role;
                 }
             } catch (error) {
                 console.error('Ошибка получения userId:', error);
             }
-        }
-        
-        function isAdmin() {
-            return userRole === 'Admin';
         }
         
         async function loadCategories() {
@@ -114,12 +111,6 @@
                 currentPage = page;
                 const loadingIndicator = document.getElementById('loadingIndicator');
                 const container = document.getElementById('placesContainer');
-                
-                if (!loadingIndicator || !container) {
-                    console.error('Не найдены элементы DOM для загрузки мест');
-                    return;
-                }
-                
                 loadingIndicator.style.display = 'block';
                 container.innerHTML = '';
                 
@@ -131,15 +122,6 @@
                 
                 // Формируем URL с правильными параметрами
                 const params = new URLSearchParams();
-                
-                // Пытаемся получить userId, если его еще нет
-                if (!userId) {
-                    try {
-                        await getUserId();
-                    } catch (e) {
-                        console.warn('Не удалось получить userId, продолжаем без него:', e);
-                    }
-                }
                 
                 if (userId) {
                     params.append('userId', userId);
@@ -204,6 +186,10 @@
                 totalCount = resultTotalCount;
                 currentPage = resultPage;
                 
+                const syncButton = document.getElementById('syncButton');
+                if (syncButton) {
+                    syncButton.style.display = 'none'; // Скрываем кнопку синхронизации, так как теперь есть пагинация
+                }
                 
                 displayPlaces(items);
                 displayPagination({ items: items, totalCount: resultTotalCount, page: resultPage, totalPages: resultTotalPages, pageSize: resultPageSize, hasPreviousPage: resultPage > 1, hasNextPage: resultPage < resultTotalPages });
@@ -370,24 +356,13 @@
                                         </button>
                                     </div>
                                 </div>
-                                <div class="d-flex gap-2 mt-2">
-                                    <a href="/Place/${place.id}" class="btn btn-primary btn-sm">Подробнее</a>
-                                    ${isAdmin() ? `
-                                        <button class="btn btn-warning btn-sm" onclick="editPlace(${place.id})" title="Редактировать">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                    ` : ''}
-                                </div>
+                                <a href="/Place/${place.id}" class="btn btn-primary btn-sm mt-2">Подробнее</a>
                             </div>
                         </div>
                     </div>
                 `;
                 container.innerHTML += card;
             });
-        }
-        
-        function editPlace(placeId) {
-            window.location.href = `/Place/${placeId}?edit=true`;
         }
 
         async function toggleFavorite(placeId, isFavorite) {
@@ -459,21 +434,48 @@
             }
         }
 
+        async function syncPlaces() {
+            const syncButton = document.getElementById('syncButton');
+            if (syncButton) {
+                syncButton.disabled = true;
+                syncButton.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Загрузка...';
+            }
+            
+            try {
+                const response = await fetch('/api/admin/sync-places', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert('Синхронизация завершена! Загружены новые места.');
+                    loadPlaces();
+                } else {
+                    const error = await response.json();
+                    alert('Ошибка синхронизации: ' + (error.error || 'Неизвестная ошибка'));
+                }
+            } catch (error) {
+                console.error('Ошибка синхронизации:', error);
+                alert('Ошибка при синхронизации мест');
+            } finally {
+                if (syncButton) {
+                    syncButton.disabled = false;
+                    syncButton.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Загрузить больше мест';
+                }
+            }
+        }
 
         (async () => {
             try {
-                // Загружаем данные параллельно, не ждем userId
-                await Promise.all([
-                    getUserId().catch(err => console.warn('Ошибка получения userId:', err)),
-                    loadCategories().catch(err => console.error('Ошибка загрузки категорий:', err))
-                ]);
+                await getUserId();
+                await loadCategories();
                 assignCategoriesIfNeeded().catch(err => console.warn('Фоновая задача присвоения категорий:', err));
-                // Загружаем места независимо от userId
                 loadPlaces();
             } catch (error) {
                 console.error('Ошибка инициализации:', error);
-                // Все равно пытаемся загрузить места
-                loadPlaces();
             }
         })();
     </script>

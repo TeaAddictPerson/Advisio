@@ -35,10 +35,3 @@ public class SubmitSurveyDto
     public List<SubmitSurveyResponseDto> Responses { get; set; } = new();
 }
 
-public class SurveyResultDto
-{
-    public bool Success { get; set; }
-    public int? FavoriteCategoryId { get; set; }
-    public string? FavoriteCategoryName { get; set; }
-}
-

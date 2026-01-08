@@ -3,6 +3,14 @@
   "WorkspaceRootPath": "D:\\CodingStuff\\Advisio\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{CFD831DE-161C-43CD-83CC-335BF367A5E3}|Advisio.API\\Advisio.API.csproj|d:\\codingstuff\\advisio\\advisio.api\\models\\place.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CFD831DE-161C-43CD-83CC-335BF367A5E3}|Advisio.API\\Advisio.API.csproj|solutionrelative:advisio.api\\models\\place.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CFD831DE-161C-43CD-83CC-335BF367A5E3}|Advisio.API\\Advisio.API.csproj|d:\\codingstuff\\advisio\\advisio.api\\services\\placeservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CFD831DE-161C-43CD-83CC-335BF367A5E3}|Advisio.API\\Advisio.API.csproj|solutionrelative:advisio.api\\services\\placeservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{CFD831DE-161C-43CD-83CC-335BF367A5E3}|Advisio.API\\Advisio.API.csproj|d:\\codingstuff\\advisio\\advisio.api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{CFD831DE-161C-43CD-83CC-335BF367A5E3}|Advisio.API\\Advisio.API.csproj|solutionrelative:advisio.api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
@@ -19,12 +27,38 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "Place.cs",
+              "DocumentMoniker": "D:\\CodingStuff\\Advisio\\Advisio.API\\Models\\Place.cs",
+              "RelativeDocumentMoniker": "Advisio.API\\Models\\Place.cs",
+              "ToolTip": "D:\\CodingStuff\\Advisio\\Advisio.API\\Models\\Place.cs*",
+              "RelativeToolTip": "Advisio.API\\Models\\Place.cs*",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABcAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-08T17:45:32.657Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "PlaceService.cs",
+              "DocumentMoniker": "D:\\CodingStuff\\Advisio\\Advisio.API\\Services\\PlaceService.cs",
+              "RelativeDocumentMoniker": "Advisio.API\\Services\\PlaceService.cs",
+              "ToolTip": "D:\\CodingStuff\\Advisio\\Advisio.API\\Services\\PlaceService.cs",
+              "RelativeToolTip": "Advisio.API\\Services\\PlaceService.cs",
+              "ViewState": "AgIAANsBAAAAAAAAAAAUwPYBAAAmAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-08T17:26:12.02Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "Program.cs",
               "DocumentMoniker": "D:\\CodingStuff\\Advisio\\Advisio.API\\Program.cs",
               "RelativeDocumentMoniker": "Advisio.API\\Program.cs",
               "ToolTip": "D:\\CodingStuff\\Advisio\\Advisio.API\\Program.cs",
               "RelativeToolTip": "Advisio.API\\Program.cs",
-              "ViewState": "AgIAACYAAAAAAAAAAAAiwEwAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAB0AAAAAAAAAAAAiwCMAAAAHAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-12-01T19:38:19.623Z",
               "EditorCaption": ""

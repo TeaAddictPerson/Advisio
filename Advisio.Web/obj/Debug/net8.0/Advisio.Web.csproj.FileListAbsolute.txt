@@ -149,4 +149,10 @@ D:\CodingStuff\Advisio\Advisio.Web\obj\Debug\net8.0\rjsmrazor.dswa.cache.json
 D:\CodingStuff\Advisio\Advisio.Web\obj\Debug\net8.0\rjsmcshtml.dswa.cache.json
 D:\CodingStuff\Advisio\Advisio.Web\obj\Debug\net8.0\staticwebassets.build.json.cache
 D:\CodingStuff\Advisio\Advisio.Web\obj\Debug\net8.0\staticwebassets.build.endpoints.json
+D:\CodingStuff\Advisio\Advisio.Web\bin\Debug\net8.0\ClientApp\tsconfig.json
+D:\CodingStuff\Advisio\Advisio.Web\bin\Debug\net8.0\ClientApp\tsconfig.node.json
+D:\CodingStuff\Advisio\Advisio.Web\bin\Debug\net8.0\package-lock.json
+D:\CodingStuff\Advisio\Advisio.Web\bin\Debug\net8.0\package.json
+D:\CodingStuff\Advisio\Advisio.Web\bin\Debug\net8.0\ClientApp\package-lock.json
+D:\CodingStuff\Advisio\Advisio.Web\bin\Debug\net8.0\ClientApp\package.json
 D:\CodingStuff\Advisio\Advisio.Web\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt

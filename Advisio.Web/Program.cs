@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Advisio.API.Data;
 using Advisio.API.Services;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,24 +38,6 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IExternalPlaceService, ExternalPlaceService>();
 builder.Services.AddHttpClient<IExternalPlaceService, ExternalPlaceService>();
-builder.Services.AddHttpClient<ITranslationService, TranslationService>(client =>
-{
-    client.Timeout = TimeSpan.FromSeconds(30);
-});
-builder.Services.AddHttpClient<IPredictHQService, PredictHQService>(client =>
-{
-    client.Timeout = TimeSpan.FromSeconds(60);
-});
-builder.Services.AddScoped<IPredictHQService>(sp =>
-{
-    var context = sp.GetRequiredService<AdvisioDbContext>();
-    var placeService = sp.GetRequiredService<IPlaceService>();
-    var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(IPredictHQService));
-    var configuration = sp.GetRequiredService<IConfiguration>();
-    var logger = sp.GetService<ILogger<PredictHQService>>();
-    var translationService = sp.GetService<ITranslationService>();
-    return new PredictHQService(context, placeService, httpClient, configuration, logger, translationService);
-});
 
 // Background Service для синхронизации мест
 var syncEnabled = builder.Configuration.GetValue<bool>("PlacesSync:Enabled", true);
@@ -68,9 +51,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:5194")
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
@@ -92,6 +76,17 @@ else
 // app.UseHttpsRedirection(); // Отключено для работы без SSL
 app.UseStaticFiles();
 
+// Serve React app static files (if built)
+if (Directory.Exists(Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "dist")))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(
+            Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "dist")),
+        RequestPath = "/dist"
+    });
+}
+
 app.UseRouting();
 
 app.UseCors("AllowAll");
@@ -100,5 +95,16 @@ app.UseAuthorization();
 
 app.MapRazorPages();
 app.MapControllers();
+
+// Catch-all route for React app (client-side routing)
+// Only map if React app is built
+if (Directory.Exists(Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "dist")))
+{
+    app.MapFallbackToFile("index.html", new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(
+            Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "dist"))
+    });
+}
 
 app.Run();

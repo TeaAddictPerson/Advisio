@@ -21,19 +21,8 @@ public class RecommendationService : IRecommendationService
         _surveyService = surveyService;
     }
 
-    public async Task<List<RecommendationDto>> GetRecommendationsAsync(int userId, int count = 20)
+    public async Task<List<RecommendationDto>> GetRecommendationsAsync(int userId, int count = 9)
     {
-        // Проверяем, есть ли у пользователя данные для генерации рекомендаций
-        var hasLikes = await _context.Likes.AnyAsync(l => l.UserId == userId);
-        var hasFavorites = await _context.Favorites.AnyAsync(f => f.UserId == userId);
-        var hasCompletedSurvey = await _surveyService.HasUserCompletedSurveyAsync(userId);
-        
-        // Если у пользователя нет лайков, избранных и не пройден опрос, возвращаем пустой список
-        if (!hasLikes && !hasFavorites && !hasCompletedSurvey)
-        {
-            return new List<RecommendationDto>();
-        }
-
         // Проверяем, есть ли рекомендации для пользователя
         var existingRecommendations = await _context.Recommendations
             .Where(r => r.UserId == userId)
@@ -47,68 +36,28 @@ public class RecommendationService : IRecommendationService
                 .ThenInclude(p => p.Likes)
             .ToListAsync();
 
-        // Проверяем, нужно ли регенерировать рекомендации
-        bool shouldRegenerate = false;
-
-        if (!existingRecommendations.Any())
+        if (existingRecommendations.Any())
         {
-            // Если рекомендаций нет, генерируем их
-            shouldRegenerate = true;
-        }
-        else
-        {
-            // Проверяем, изменились ли лайки или избранные после генерации рекомендаций
-            var oldestRecommendationTime = existingRecommendations.Min(r => r.CreatedAt);
-            
-            // Получаем время последнего изменения лайков или избранных
-            var lastLikeChange = await _context.Likes
-                .Where(l => l.UserId == userId)
-                .OrderByDescending(l => l.CreatedAt)
-                .Select(l => l.CreatedAt)
-                .FirstOrDefaultAsync();
-
-            var lastFavoriteChange = await _context.Favorites
-                .Where(f => f.UserId == userId)
-                .OrderByDescending(f => f.CreatedAt)
-                .Select(f => f.CreatedAt)
-                .FirstOrDefaultAsync();
-
-            var lastChange = new[] { lastLikeChange, lastFavoriteChange }
-                .Where(d => d != default(DateTime))
-                .DefaultIfEmpty(DateTime.MinValue)
-                .Max();
-
-            // Если были изменения после генерации рекомендаций, регенерируем
-            if (lastChange > oldestRecommendationTime)
+            return existingRecommendations.Select(r => new RecommendationDto
             {
-                shouldRegenerate = true;
-            }
-            // Если у пользователя нет лайков и избранных, но рекомендации есть - регенерируем
-            else if (!hasLikes && !hasFavorites && existingRecommendations.Any())
-            {
-                shouldRegenerate = true;
-            }
-            // Также регенерируем, если рекомендации старше 1 часа
-            else if (oldestRecommendationTime < DateTime.UtcNow.AddHours(-1))
-            {
-                shouldRegenerate = true;
-            }
+                Id = r.Id,
+                Place = _placeService.GetPlaceByIdAsync(r.PlaceId, userId).Result!,
+                Score = r.Score,
+                Reason = r.Reason,
+                CreatedAt = r.CreatedAt,
+                IsViewed = r.IsViewed
+            }).ToList();
         }
 
-        // Если рекомендаций меньше 15, регенерируем (только если есть данные для генерации)
-        if (existingRecommendations.Count < 15 && (hasLikes || hasFavorites || hasCompletedSurvey))
-        {
-            shouldRegenerate = true;
-        }
+        // Если рекомендаций нет, генерируем их
+        await GenerateRecommendationsAsync(userId);
 
-        if (shouldRegenerate)
-        {
-            await GenerateRecommendationsAsync(userId);
-        }
-
-        // Получаем рекомендации (новые или существующие)
-        var recommendations = await _context.Recommendations
+        // Повторно получаем рекомендации
+        var newRecommendations = await _context.Recommendations
             .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.Score)
+            .ThenByDescending(r => r.CreatedAt)
+            .Take(count)
             .Include(r => r.Place)
                 .ThenInclude(p => p.PlaceCategories)
                     .ThenInclude(pc => pc.Category)
@@ -116,23 +65,7 @@ public class RecommendationService : IRecommendationService
                 .ThenInclude(p => p.Likes)
             .ToListAsync();
 
-        // Получаем количество лайков для каждого места
-        var placeIds = recommendations.Select(r => r.PlaceId).ToList();
-        var likesCounts = await _context.Likes
-            .Where(l => placeIds.Contains(l.PlaceId))
-            .GroupBy(l => l.PlaceId)
-            .Select(g => new { PlaceId = g.Key, LikesCount = g.Count() })
-            .ToDictionaryAsync(x => x.PlaceId, x => x.LikesCount);
-
-        // Сортируем по score, затем по количеству лайков, затем по дате создания
-        recommendations = recommendations
-            .OrderByDescending(r => r.Score)
-            .ThenByDescending(r => likesCounts.GetValueOrDefault(r.PlaceId, 0))
-            .ThenByDescending(r => r.CreatedAt)
-            .Take(count)
-            .ToList();
-
-        return recommendations.Select(r => new RecommendationDto
+        return newRecommendations.Select(r => new RecommendationDto
         {
             Id = r.Id,
             Place = _placeService.GetPlaceByIdAsync(r.PlaceId, userId).Result!,
@@ -151,447 +84,107 @@ public class RecommendationService : IRecommendationService
             .ToListAsync();
         _context.Recommendations.RemoveRange(oldRecommendations);
 
-        // Получаем места, которые пользователь уже лайкнул или добавил в избранное
-        // НЕ исключаем их из рекомендаций, а даем им бонус
-        var userLikedPlaceIds = (await _context.Likes
-            .Where(l => l.UserId == userId)
-            .Select(l => l.PlaceId)
-            .ToListAsync()).ToHashSet();
-
-        var userFavoritePlaceIds = (await _context.Favorites
-            .Where(f => f.UserId == userId)
-            .Select(f => f.PlaceId)
-            .ToListAsync()).ToHashSet();
-
-        // Словарь для хранения рекомендаций (PlaceId -> Recommendation)
-        var recommendationsDict = new Dictionary<int, Recommendation>();
-
-        // 1. Рекомендации на основе лайков и избранных пользователя
-        await GenerateRecommendationsFromUserPreferencesAsync(userId, recommendationsDict);
-
-        // 2. Коллаборативная фильтрация (похожие пользователи)
-        await GenerateCollaborativeRecommendationsAsync(userId, userLikedPlaceIds, userFavoritePlaceIds, recommendationsDict);
-
-        // 3. Новые места/мероприятия
-        await GenerateNewPlacesRecommendationsAsync(userId, recommendationsDict);
-
-        // 4. Если у пользователя есть опрос, добавляем рекомендации на его основе
         var hasCompletedSurvey = await _surveyService.HasUserCompletedSurveyAsync(userId);
+
         if (hasCompletedSurvey)
         {
-            await GenerateRecommendationsFromSurveyAsync(userId, recommendationsDict);
+            // Генерируем рекомендации на основе опроса
+            await GenerateRecommendationsFromSurveyAsync(userId);
         }
-
-        // 5. Балансировка рекомендаций: ~40% из лайков/избранного, ~60% из любимой категории
-        await BalanceRecommendationsAsync(userId, userLikedPlaceIds, userFavoritePlaceIds, recommendationsDict);
-
-        // 6. Если рекомендаций мало, добавляем дефолтные
-        if (recommendationsDict.Count < 20)
+        else
         {
-            await GenerateDefaultRecommendationsAsync(userId, recommendationsDict);
+            // Для новых пользователей - рекомендуем по несколько мест из каждой категории
+            await GenerateDefaultRecommendationsAsync(userId);
         }
 
-        // Добавляем бонус для мест, которые пользователь лайкнул или добавил в избранное
-        foreach (var recommendation in recommendationsDict.Values)
-        {
-            var isLiked = userLikedPlaceIds.Contains(recommendation.PlaceId);
-            var isFavorite = userFavoritePlaceIds.Contains(recommendation.PlaceId);
-            
-            // Большой бонус за лайк или избранное - это означает, что место точно нравится пользователю
-            if (isLiked && isFavorite)
-            {
-                recommendation.Score += 50m; // Максимальный бонус за оба действия
-            }
-            else if (isLiked)
-            {
-                recommendation.Score += 30m; // Бонус за лайк
-            }
-            else if (isFavorite)
-            {
-                recommendation.Score += 25m; // Бонус за избранное
-            }
-        }
-
-        // Получаем количество лайков для каждого места и добавляем бонус к score
-        var placeIds = recommendationsDict.Keys.ToList();
-        var likesCounts = await _context.Likes
-            .Where(l => placeIds.Contains(l.PlaceId))
-            .GroupBy(l => l.PlaceId)
-            .Select(g => new { PlaceId = g.Key, LikesCount = g.Count() })
-            .ToDictionaryAsync(x => x.PlaceId, x => x.LikesCount);
-
-        // Добавляем бонус к score на основе количества лайков от всех пользователей
-        foreach (var recommendation in recommendationsDict.Values)
-        {
-            var likesCount = likesCounts.GetValueOrDefault(recommendation.PlaceId, 0);
-            // Бонус: до 10 лайков = +1 за лайк, от 10 до 50 = +0.5 за лайк, свыше 50 = фиксированный бонус
-            var likesBonus = likesCount <= 10 ? likesCount * 1m : 
-                            likesCount <= 50 ? 10m + (likesCount - 10) * 0.5m : 
-                            30m + Math.Min((likesCount - 50) * 0.2m, 20m); // Максимум 50 бонусных очков
-            recommendation.Score += likesBonus;
-        }
-
-        // Сортируем по score, затем по количеству лайков, затем по дате создания
-        var finalRecommendations = recommendationsDict.Values
-            .OrderByDescending(r => r.Score)
-            .ThenByDescending(r => likesCounts.GetValueOrDefault(r.PlaceId, 0))
-            .ThenByDescending(r => r.CreatedAt)
-            .Take(20)
-            .ToList();
-
-        _context.Recommendations.AddRange(finalRecommendations);
         await _context.SaveChangesAsync();
     }
 
-    // 1. Рекомендации на основе лайков и избранных пользователя
-    private async Task GenerateRecommendationsFromUserPreferencesAsync(
-        int userId, 
-        Dictionary<int, Recommendation> recommendationsDict)
+    private async Task GenerateRecommendationsFromSurveyAsync(int userId)
     {
-        // Получаем все места, которые пользователь лайкнул или добавил в избранное
-        var userLikedPlaces = await _context.Likes
-            .Where(l => l.UserId == userId)
-            .Include(l => l.Place)
-                .ThenInclude(p => p.PlaceCategories)
-                    .ThenInclude(pc => pc.Category)
-            .Select(l => l.Place)
+        // Получаем ответы пользователя на опрос
+        var userResponses = await _context.UserSurveyResponses
+            .Where(usr => usr.UserId == userId)
+            .Include(usr => usr.Answer)
             .ToListAsync();
 
-        var userFavoritePlaces = await _context.Favorites
-            .Where(f => f.UserId == userId)
-            .Include(f => f.Place)
-                .ThenInclude(p => p.PlaceCategories)
-                    .ThenInclude(pc => pc.Category)
-            .Select(f => f.Place)
+        if (!userResponses.Any()) return;
+
+        // Вычисляем средний вес ответов пользователя
+        var averageWeight = (decimal)userResponses.Average(ur => ur.Answer.Weight);
+
+        // Определяем подходящие категории на основе веса
+        // Пример: 10-40 активный отдых, 50-90 спокойный отдых
+        var suitableCategoryTypes = DetermineCategoryTypesByWeight(averageWeight);
+
+        // Получаем все категории подходящих типов
+        var suitableCategories = await _context.Categories
+            .Where(c => suitableCategoryTypes.Contains(c.Type))
+            .Select(c => c.Id)
             .ToListAsync();
 
-        var allUserPreferredPlaces = userLikedPlaces.Union(userFavoritePlaces).ToList();
+        if (!suitableCategories.Any()) return;
 
-        if (!allUserPreferredPlaces.Any()) return;
-
-        // Собираем категории из понравившихся мест
-        var preferredCategoryIds = allUserPreferredPlaces
-            .SelectMany(p => p.PlaceCategories.Select(pc => pc.CategoryId))
+        // Получаем места, которые относятся к подходящим категориям
+        var recommendedPlaces = await _context.PlaceCategories
+            .Where(pc => suitableCategories.Contains(pc.CategoryId))
+            .Select(pc => pc.Place)
             .Distinct()
+            .Include(p => p.PlaceCategories)
+                .ThenInclude(pc => pc.Category)
+            .ToListAsync();
+
+        // Исключаем места, которые пользователь уже лайкнул или добавил в избранное
+        var userLikedPlaceIds = await _context.Likes
+            .Where(l => l.UserId == userId)
+            .Select(l => l.PlaceId)
+            .ToListAsync();
+
+        var userFavoritePlaceIds = await _context.Favorites
+            .Where(f => f.UserId == userId)
+            .Select(f => f.PlaceId)
+            .ToListAsync();
+
+        var excludedPlaceIds = userLikedPlaceIds.Union(userFavoritePlaceIds).ToList();
+
+        recommendedPlaces = recommendedPlaces
+            .Where(p => !excludedPlaceIds.Contains(p.Id))
             .ToList();
 
-        if (!preferredCategoryIds.Any()) return;
-
-        // Находим места с такими же категориями (включая уже лайкнутые - они получат бонус)
-        var similarPlaces = await _context.PlaceCategories
-            .Where(pc => preferredCategoryIds.Contains(pc.CategoryId))
-            .Select(pc => pc.Place)
-            .Distinct()
-            .Include(p => p.PlaceCategories)
-                .ThenInclude(pc => pc.Category)
-            .ToListAsync();
-
-        foreach (var place in similarPlaces)
-        {
-            var placeCategoryIds = place.PlaceCategories.Select(pc => pc.CategoryId).ToList();
-            var matchingCategoriesCount = placeCategoryIds.Intersect(preferredCategoryIds).Count();
-            
-            // Чем больше совпадающих категорий, тем выше score
-            // Бонус за количество совпадающих категорий
-            var baseScore = (matchingCategoriesCount / (decimal)Math.Max(preferredCategoryIds.Count, 1)) * 100;
-            var bonus = matchingCategoriesCount > 0 ? (matchingCategoriesCount * 10m) : 0m; // Бонус за каждую совпадающую категорию
-            var score = Math.Min(baseScore + bonus, 100m); // Ограничиваем максимум 100
-
-            if (!recommendationsDict.ContainsKey(place.Id) || recommendationsDict[place.Id].Score < score)
-            {
-                var categoryNames = string.Join(", ", place.PlaceCategories.Select(pc => pc.Category.Name).Take(3));
-                recommendationsDict[place.Id] = new Recommendation
-                {
-                    UserId = userId,
-                    PlaceId = place.Id,
-                    Score = score,
-                    Reason = $"Похоже на ваши избранные места. Категории: {categoryNames}",
-                    CreatedAt = DateTime.UtcNow,
-                    IsViewed = false
-                };
-            }
-        }
-    }
-
-    // 2. Коллаборативная фильтрация - находим похожих пользователей
-    private async Task GenerateCollaborativeRecommendationsAsync(
-        int userId, 
-        HashSet<int> userLikedPlaceIds,
-        HashSet<int> userFavoritePlaceIds,
-        Dictionary<int, Recommendation> recommendationsDict)
-    {
-        var userPreferredPlaceIds = userLikedPlaceIds.Union(userFavoritePlaceIds).ToHashSet();
-
-        if (!userPreferredPlaceIds.Any()) return;
-
-        // Находим пользователей, которые лайкнули или добавили в избранное те же места
-        var similarUsers = await _context.Likes
-            .Where(l => userPreferredPlaceIds.Contains(l.PlaceId) && l.UserId != userId)
-            .Select(l => l.UserId)
-            .Union(
-                _context.Favorites
-                    .Where(f => userPreferredPlaceIds.Contains(f.PlaceId) && f.UserId != userId)
-                    .Select(f => f.UserId)
-            )
-            .GroupBy(u => u)
-            .Select(g => new { UserId = g.Key, CommonPlacesCount = g.Count() })
-            .OrderByDescending(x => x.CommonPlacesCount)
-            .Take(10) // Топ-10 похожих пользователей
-            .Select(x => x.UserId)
-            .ToListAsync();
-
-        if (!similarUsers.Any()) return;
-
-        // Находим места, которые понравились похожим пользователям (включая уже лайкнутые пользователем)
-        var collaborativePlaces = await _context.Likes
-            .Where(l => similarUsers.Contains(l.UserId))
-            .Select(l => new { PlaceId = l.PlaceId, UserId = l.UserId })
-            .Union(
-                _context.Favorites
-                    .Where(f => similarUsers.Contains(f.UserId))
-                    .Select(f => new { PlaceId = f.PlaceId, UserId = f.UserId })
-            )
-            .GroupBy(x => x.PlaceId)
-            .Select(g => new { PlaceId = g.Key, Popularity = g.Count() })
-            .OrderByDescending(x => x.Popularity)
-            .Take(20) // Топ-20 мест от похожих пользователей
-            .Select(x => x.PlaceId)
-            .ToListAsync();
-
-        if (!collaborativePlaces.Any()) return;
-
-        // Получаем полную информацию о местах
-        var places = await _context.Places
-            .Where(p => collaborativePlaces.Contains(p.Id))
-            .Include(p => p.PlaceCategories)
-                .ThenInclude(pc => pc.Category)
-            .ToListAsync();
-
-        foreach (var place in places)
-        {
-            var popularity = await _context.Likes
-                .Where(l => l.PlaceId == place.Id && similarUsers.Contains(l.UserId))
-                .CountAsync() +
-                await _context.Favorites
-                    .Where(f => f.PlaceId == place.Id && similarUsers.Contains(f.UserId))
-                    .CountAsync();
-
-            // Score на основе популярности среди похожих пользователей
-            var score = Math.Min(80m + (popularity * 5m), 95m);
-
-            if (!recommendationsDict.ContainsKey(place.Id) || recommendationsDict[place.Id].Score < score)
-            {
-                recommendationsDict[place.Id] = new Recommendation
-                {
-                    UserId = userId,
-                    PlaceId = place.Id,
-                    Score = score,
-                    Reason = $"Понравилось пользователям с похожими предпочтениями",
-                    CreatedAt = DateTime.UtcNow,
-                    IsViewed = false
-                };
-            }
-        }
-    }
-
-    // 3. Новые места/мероприятия
-    private async Task GenerateNewPlacesRecommendationsAsync(
-        int userId, 
-        Dictionary<int, Recommendation> recommendationsDict)
-    {
-        // Места, созданные за последние 30 дней (включая уже лайкнутые)
-        var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
-        var newPlaces = await _context.Places
-            .Where(p => p.CreatedAt >= thirtyDaysAgo)
-            .Include(p => p.PlaceCategories)
-                .ThenInclude(pc => pc.Category)
-            .OrderByDescending(p => p.CreatedAt)
-            .Take(15) // Топ-15 новых мест
-            .ToListAsync();
-
-        foreach (var place in newPlaces)
-        {
-            // Чем новее место, тем выше score
-            var daysSinceCreation = (DateTime.UtcNow - place.CreatedAt).Days;
-            var freshnessBonus = Math.Max(0, 30 - daysSinceCreation); // Бонус за новизну
-            var baseScore = 60m + (freshnessBonus * 1.5m); // От 60 до 105
-
-            if (!recommendationsDict.ContainsKey(place.Id) || recommendationsDict[place.Id].Score < baseScore)
-            {
-                var categoryNames = string.Join(", ", place.PlaceCategories.Select(pc => pc.Category.Name).Take(2));
-                recommendationsDict[place.Id] = new Recommendation
-                {
-                    UserId = userId,
-                    PlaceId = place.Id,
-                    Score = baseScore,
-                    Reason = $"Новое мероприятие! {categoryNames}",
-                    CreatedAt = DateTime.UtcNow,
-                    IsViewed = false
-                };
-            }
-        }
-    }
-
-    // 4. Рекомендации на основе опроса (обновленная версия с любимой категорией)
-    private async Task GenerateRecommendationsFromSurveyAsync(
-        int userId, 
-        Dictionary<int, Recommendation> recommendationsDict)
-    {
-        // Получаем любимую категорию пользователя из опроса
-        var favoriteCategoryId = await _surveyService.GetUserFavoriteCategoryIdAsync(userId);
-        
-        if (!favoriteCategoryId.HasValue) return;
-
-        // Получаем места из любимой категории
-        var recommendedPlaces = await _context.PlaceCategories
-            .Where(pc => pc.CategoryId == favoriteCategoryId.Value)
-            .Select(pc => pc.Place)
-            .Distinct()
-            .Include(p => p.PlaceCategories)
-                .ThenInclude(pc => pc.Category)
-            .Include(p => p.Likes)
-            .Take(20) // Берем до 20 мест из любимой категории
-            .ToListAsync();
+        // Вычисляем оценку релевантности для каждого места
+        var recommendations = new List<Recommendation>();
 
         foreach (var place in recommendedPlaces)
         {
             var placeCategories = place.PlaceCategories.Select(pc => pc.Category).ToList();
-            var isInFavoriteCategory = placeCategories.Any(c => c.Id == favoriteCategoryId.Value);
-            
-            // Базовая оценка для мест из любимой категории
-            var score = 60m; // Высокий базовый score для любимой категории
-            
-            // Бонус за популярность
-            var likesCount = place.Likes?.Count ?? 0;
-            score += Math.Min(likesCount * 0.5m, 10m); // До 10 бонусных очков за популярность
+            var matchingCategories = placeCategories
+                .Where(c => suitableCategories.Contains(c.Id))
+                .Count();
 
-            if (!recommendationsDict.ContainsKey(place.Id) || recommendationsDict[place.Id].Score < score)
+            // Оценка на основе количества совпадающих категорий и среднего веса
+            var score = CalculateRecommendationScore(matchingCategories, averageWeight, placeCategories.Count);
+
+            recommendations.Add(new Recommendation
             {
-                var categoryName = placeCategories.FirstOrDefault(c => c.Id == favoriteCategoryId.Value)?.Name ?? "любимая категория";
-                recommendationsDict[place.Id] = new Recommendation
-                {
-                    UserId = userId,
-                    PlaceId = place.Id,
-                    Score = score,
-                    Reason = $"Рекомендуется на основе вашей любимой категории: {categoryName}",
-                    CreatedAt = DateTime.UtcNow,
-                    IsViewed = false
-                };
-            }
+                UserId = userId,
+                PlaceId = place.Id,
+                Score = score,
+                Reason = GenerateRecommendationReason(placeCategories, averageWeight),
+                CreatedAt = DateTime.UtcNow,
+                IsViewed = false
+            });
         }
-    }
 
-    // Балансировка рекомендаций: ~40% из лайков/избранного, ~60% из любимой категории
-    private async Task BalanceRecommendationsAsync(
-        int userId,
-        HashSet<int> userLikedPlaceIds,
-        HashSet<int> userFavoritePlaceIds,
-        Dictionary<int, Recommendation> recommendationsDict)
-    {
-        // Разделяем рекомендации на две группы
-        var likedFavoriteRecommendations = recommendationsDict.Values
-            .Where(r => userLikedPlaceIds.Contains(r.PlaceId) || userFavoritePlaceIds.Contains(r.PlaceId))
+        // Сортируем по оценке и берем топ-9
+        recommendations = recommendations
             .OrderByDescending(r => r.Score)
+            .Take(9)
             .ToList();
 
-        var favoriteCategoryId = await _surveyService.GetUserFavoriteCategoryIdAsync(userId);
-        var categoryRecommendations = new List<Recommendation>();
-
-        if (favoriteCategoryId.HasValue)
-        {
-            categoryRecommendations = recommendationsDict.Values
-                .Where(r =>
-                {
-                    var place = _context.Places
-                        .Include(p => p.PlaceCategories)
-                        .FirstOrDefault(p => p.Id == r.PlaceId);
-                    return place?.PlaceCategories.Any(pc => pc.CategoryId == favoriteCategoryId.Value) == true;
-                })
-                .OrderByDescending(r => r.Score)
-                .ToList();
-        }
-
-        // Если нет рекомендаций из категории, используем все остальные
-        if (!categoryRecommendations.Any())
-        {
-            categoryRecommendations = recommendationsDict.Values
-                .Where(r => !userLikedPlaceIds.Contains(r.PlaceId) && !userFavoritePlaceIds.Contains(r.PlaceId))
-                .OrderByDescending(r => r.Score)
-                .ToList();
-        }
-
-        // Целевое количество: 8 из лайков/избранного (40%), 12 из категории (60%)
-        var targetLikedFavorite = 8;
-        var targetCategory = 12;
-
-        // Очищаем словарь и заполняем сбалансированными рекомендациями
-        recommendationsDict.Clear();
-
-        // Добавляем рекомендации из лайков/избранного
-        foreach (var rec in likedFavoriteRecommendations.Take(targetLikedFavorite))
-        {
-            rec.Score += 80m; // Большой бонус за лайк/избранное
-            recommendationsDict[rec.PlaceId] = rec;
-        }
-
-        // Добавляем рекомендации из любимой категории
-        foreach (var rec in categoryRecommendations.Take(targetCategory))
-        {
-            if (!recommendationsDict.ContainsKey(rec.PlaceId))
-            {
-                rec.Score += 15m; // Бонус за любимую категорию
-                recommendationsDict[rec.PlaceId] = rec;
-            }
-        }
-
-        // Если не хватает рекомендаций, добавляем остальные
-        var remaining = 20 - recommendationsDict.Count;
-        if (remaining > 0)
-        {
-            var allRecommendations = likedFavoriteRecommendations
-                .Concat(categoryRecommendations)
-                .Where(r => !recommendationsDict.ContainsKey(r.PlaceId))
-                .OrderByDescending(r => r.Score)
-                .Take(remaining);
-
-            foreach (var rec in allRecommendations)
-            {
-                recommendationsDict[rec.PlaceId] = rec;
-            }
-        }
-
-        // Если все еще не хватает, добавляем популярные места
-        if (recommendationsDict.Count < 20)
-        {
-            var popularPlaces = await _context.Places
-                .Include(p => p.Likes)
-                .Include(p => p.PlaceCategories)
-                .OrderByDescending(p => p.Likes.Count)
-                .ThenByDescending(p => p.CreatedAt)
-                .Where(p => !recommendationsDict.ContainsKey(p.Id))
-                .Take(20 - recommendationsDict.Count)
-                .ToListAsync();
-
-            foreach (var place in popularPlaces)
-            {
-                var likesCount = place.Likes?.Count ?? 0;
-                recommendationsDict[place.Id] = new Recommendation
-                {
-                    UserId = userId,
-                    PlaceId = place.Id,
-                    Score = 30m + Math.Min(likesCount * 0.5m, 10m),
-                    Reason = "Популярное место",
-                    CreatedAt = DateTime.UtcNow,
-                    IsViewed = false
-                };
-            }
-        }
+        _context.Recommendations.AddRange(recommendations);
     }
 
-    // 5. Дефолтные рекомендации для новых пользователей
-    private async Task GenerateDefaultRecommendationsAsync(
-        int userId, 
-        Dictionary<int, Recommendation> recommendationsDict)
+    private async Task GenerateDefaultRecommendationsAsync(int userId)
     {
         // Получаем все категории
         var categories = await _context.Categories.ToListAsync();
@@ -599,7 +192,10 @@ public class RecommendationService : IRecommendationService
         // Группируем по типам
         var categoriesByType = categories.GroupBy(c => c.Type).ToList();
 
-        // Для каждой категории берем несколько мест (включая уже лайкнутые)
+        var recommendations = new List<Recommendation>();
+        var recommendedPlaceIds = new HashSet<int>();
+
+        // Для каждой категории берем несколько мест
         foreach (var categoryGroup in categoriesByType)
         {
             var placesInCategory = await _context.PlaceCategories
@@ -611,9 +207,9 @@ public class RecommendationService : IRecommendationService
 
             foreach (var place in placesInCategory)
             {
-                if (!recommendationsDict.ContainsKey(place.Id))
+                if (!recommendedPlaceIds.Contains(place.Id))
                 {
-                    recommendationsDict[place.Id] = new Recommendation
+                    recommendations.Add(new Recommendation
                     {
                         UserId = userId,
                         PlaceId = place.Id,
@@ -621,10 +217,14 @@ public class RecommendationService : IRecommendationService
                         Reason = $"Рекомендация из категории: {categoryGroup.First().Name}",
                         CreatedAt = DateTime.UtcNow,
                         IsViewed = false
-                    };
+                    });
+
+                    recommendedPlaceIds.Add(place.Id);
                 }
             }
         }
+
+        _context.Recommendations.AddRange(recommendations);
     }
 
     private List<CategoryType> DetermineCategoryTypesByWeight(decimal averageWeight)

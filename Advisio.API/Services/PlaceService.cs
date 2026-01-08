@@ -2,30 +2,22 @@ using Microsoft.EntityFrameworkCore;
 using Advisio.API.Data;
 using Advisio.API.DTOs;
 using Advisio.API.Models;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Advisio.API.Services;
 
 public class PlaceService : IPlaceService
 {
     private readonly AdvisioDbContext _context;
-    private readonly IServiceProvider _serviceProvider;
 
-    public PlaceService(AdvisioDbContext context, IServiceProvider serviceProvider)
+    public PlaceService(AdvisioDbContext context)
     {
         _context = context;
-        _serviceProvider = serviceProvider;
     }
 
     public async Task<PagedResult<PlaceDto>> GetAllPlacesAsync(int? userId = null, string? searchQuery = null, int? categoryId = null, string? type = null, string? sortBy = null, int page = 1, int pageSize = 30)
     {
         try
         {
-            // Валидация параметров пагинации
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 30;
-            if (pageSize > 100) pageSize = 100; // Максимальный размер страницы
-
             var query = _context.Places
                 .Include(p => p.PlaceCategories)
                     .ThenInclude(pc => pc.Category)
@@ -50,33 +42,33 @@ public class PlaceService : IPlaceService
                                          p.PlaceCategories.Any(pc => pc.CategoryId == categoryId.Value));
             }
 
-            // Фильтрация по типу мероприятия
+            // Фильтрация по типу
             if (!string.IsNullOrWhiteSpace(type))
             {
-                query = query.Where(p => p.Type != null && p.Type.Equals(type, StringComparison.OrdinalIgnoreCase));
+                var typeLower = type.ToLower();
+                query = query.Where(p => p.Type != null && p.Type.ToLower() == typeLower);
             }
 
             // Сортировка
             var sortByLower = string.IsNullOrEmpty(sortBy) ? null : sortBy.ToLower();
             query = sortByLower switch
             {
-                "name" => query.OrderBy(p => p.Name),
-                "name_desc" => query.OrderByDescending(p => p.Name),
-                "likes" => query.OrderByDescending(p => p.Likes != null ? p.Likes.Count : 0),
-                "likes_asc" => query.OrderBy(p => p.Likes != null ? p.Likes.Count : 0),
-                "created" => query.OrderByDescending(p => p.CreatedAt),
-                "created_asc" => query.OrderBy(p => p.CreatedAt),
+                "name" or "name-asc" => query.OrderBy(p => p.Name),
+                "name_desc" or "name-desc" => query.OrderByDescending(p => p.Name),
+                "likes" or "likes-desc" => query.OrderByDescending(p => p.Likes != null ? p.Likes.Count : 0),
+                "likes_asc" or "likes-asc" => query.OrderBy(p => p.Likes != null ? p.Likes.Count : 0),
+                "created" or "date-desc" => query.OrderByDescending(p => p.CreatedAt),
+                "created_asc" or "date-asc" => query.OrderBy(p => p.CreatedAt),
                 _ => query.OrderByDescending(p => p.CreatedAt) // По умолчанию по дате создания
             };
 
-            // Получаем общее количество записей
             var totalCount = await query.CountAsync();
             System.Diagnostics.Debug.WriteLine($"Всего мест в запросе: {totalCount}");
             
-            // Применяем пагинацию
+            // Пагинация
             var skip = (page - 1) * pageSize;
             var places = await query.Skip(skip).Take(pageSize).ToListAsync();
-            System.Diagnostics.Debug.WriteLine($"Взято мест: {places.Count} (страница {page}, размер {pageSize})");
+            System.Diagnostics.Debug.WriteLine($"Взято мест после пагинации: {places.Count}");
 
             HashSet<int>? favoritePlaceIds = null;
             HashSet<int>? likedPlaceIds = null;
@@ -172,7 +164,6 @@ public class PlaceService : IPlaceService
             ImageUrl = createPlaceDto.ImageUrl,
             Latitude = createPlaceDto.Latitude,
             Longitude = createPlaceDto.Longitude,
-            Type = createPlaceDto.Type,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -200,6 +191,73 @@ public class PlaceService : IPlaceService
         return await GetPlaceByIdAsync(place.Id) ?? throw new Exception("Место не найдено после создания");
     }
 
+    public async Task<PlaceDto> UpdatePlaceAsync(int id, UpdatePlaceDto updatePlaceDto)
+    {
+        var place = await _context.Places
+            .Include(p => p.PlaceCategories)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (place == null)
+            throw new ArgumentException("Место не найдено");
+
+        place.Name = updatePlaceDto.Name.Trim();
+        place.Description = updatePlaceDto.Description ?? string.Empty;
+        place.Address = updatePlaceDto.Address;
+        place.ImageUrl = updatePlaceDto.ImageUrl;
+        place.Latitude = updatePlaceDto.Latitude;
+        place.Longitude = updatePlaceDto.Longitude;
+        place.Type = updatePlaceDto.Type;
+        place.UpdatedAt = DateTime.UtcNow;
+
+        // Обновляем категории
+        _context.PlaceCategories.RemoveRange(place.PlaceCategories);
+        if (updatePlaceDto.CategoryIds != null && updatePlaceDto.CategoryIds.Any())
+        {
+            foreach (var categoryId in updatePlaceDto.CategoryIds)
+            {
+                var categoryExists = await _context.Categories.AnyAsync(c => c.Id == categoryId);
+                if (categoryExists)
+                {
+                    _context.PlaceCategories.Add(new PlaceCategory
+                    {
+                        PlaceId = place.Id,
+                        CategoryId = categoryId
+                    });
+                }
+            }
+        }
+
+        await _context.SaveChangesAsync();
+        return await GetPlaceByIdAsync(place.Id) ?? throw new Exception("Место не найдено после обновления");
+    }
+
+    public async Task<bool> DeletePlaceAsync(int id)
+    {
+        var place = await _context.Places
+            .Include(p => p.PlaceCategories)
+            .Include(p => p.Favorites)
+            .Include(p => p.Likes)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (place == null)
+            return false;
+
+        // Удаляем связанные данные
+        _context.PlaceCategories.RemoveRange(place.PlaceCategories);
+        _context.Favorites.RemoveRange(place.Favorites);
+        _context.Likes.RemoveRange(place.Likes);
+        
+        // Удаляем рекомендации, связанные с этим местом
+        var recommendations = await _context.Recommendations
+            .Where(r => r.PlaceId == id)
+            .ToListAsync();
+        _context.Recommendations.RemoveRange(recommendations);
+
+        _context.Places.Remove(place);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
     public async Task<bool> AddToFavoritesAsync(int userId, int placeId)
     {
         var exists = await _context.Favorites
@@ -215,23 +273,6 @@ public class PlaceService : IPlaceService
         });
 
         await _context.SaveChangesAsync();
-        
-        // Асинхронно регенерируем рекомендации
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                using var scope = _serviceProvider.CreateScope();
-                var recommendationService = scope.ServiceProvider.GetRequiredService<IRecommendationService>();
-                await recommendationService.GenerateRecommendationsAsync(userId);
-            }
-            catch (Exception ex)
-            {
-                // Логируем ошибку, но не прерываем выполнение
-                System.Diagnostics.Debug.WriteLine($"Ошибка при регенерации рекомендаций: {ex.Message}");
-            }
-        });
-        
         return true;
     }
 
@@ -244,23 +285,6 @@ public class PlaceService : IPlaceService
 
         _context.Favorites.Remove(favorite);
         await _context.SaveChangesAsync();
-        
-        // Асинхронно регенерируем рекомендации
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                using var scope = _serviceProvider.CreateScope();
-                var recommendationService = scope.ServiceProvider.GetRequiredService<IRecommendationService>();
-                await recommendationService.GenerateRecommendationsAsync(userId);
-            }
-            catch (Exception ex)
-            {
-                // Логируем ошибку, но не прерываем выполнение
-                System.Diagnostics.Debug.WriteLine($"Ошибка при регенерации рекомендаций: {ex.Message}");
-            }
-        });
-        
         return true;
     }
 
@@ -279,23 +303,6 @@ public class PlaceService : IPlaceService
         });
 
         await _context.SaveChangesAsync();
-        
-        // Асинхронно регенерируем рекомендации
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                using var scope = _serviceProvider.CreateScope();
-                var recommendationService = scope.ServiceProvider.GetRequiredService<IRecommendationService>();
-                await recommendationService.GenerateRecommendationsAsync(userId);
-            }
-            catch (Exception ex)
-            {
-                // Логируем ошибку, но не прерываем выполнение
-                System.Diagnostics.Debug.WriteLine($"Ошибка при регенерации рекомендаций: {ex.Message}");
-            }
-        });
-        
         return true;
     }
 
@@ -308,23 +315,6 @@ public class PlaceService : IPlaceService
 
         _context.Likes.Remove(like);
         await _context.SaveChangesAsync();
-        
-        // Асинхронно регенерируем рекомендации
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                using var scope = _serviceProvider.CreateScope();
-                var recommendationService = scope.ServiceProvider.GetRequiredService<IRecommendationService>();
-                await recommendationService.GenerateRecommendationsAsync(userId);
-            }
-            catch (Exception ex)
-            {
-                // Логируем ошибку, но не прерываем выполнение
-                System.Diagnostics.Debug.WriteLine($"Ошибка при регенерации рекомендаций: {ex.Message}");
-            }
-        });
-        
         return true;
     }
 
@@ -383,8 +373,8 @@ public class PlaceService : IPlaceService
             if (!placesWithoutCategories.Any())
                 return;
 
-            // Получаем все категории
-            var categories = await _context.Categories.ToListAsync();
+        // Получаем все категории
+        var categories = await _context.Categories.ToListAsync();
 
         // Находим категории по ключевым словам
         var activeCategory = categories.FirstOrDefault(c => 
@@ -452,96 +442,30 @@ public class PlaceService : IPlaceService
                 categoryIds.Add(friendsCategory.Id);
             }
 
-            // Добавляем категории к месту с проверкой на дубликаты
+            // Получаем существующие категории для этого места
+            var existingCategoryIds = await _context.PlaceCategories
+                .Where(pc => pc.PlaceId == place.Id)
+                .Select(pc => pc.CategoryId)
+                .ToListAsync();
+
+            // Добавляем категории к месту
             foreach (var categoryId in categoryIds)
+
             {
-                // Проверяем, существует ли уже такая связь в базе данных
-                var exists = await _context.PlaceCategories
-                    .AnyAsync(pc => pc.PlaceId == place.Id && pc.CategoryId == categoryId);
-                
-                if (!exists)
+                if (!existingCategoryIds.Contains(categoryId))
                 {
-                    try
+                    _context.PlaceCategories.Add(new PlaceCategory
                     {
-                        _context.PlaceCategories.Add(new PlaceCategory
-                        {
-                            PlaceId = place.Id,
-                            CategoryId = categoryId
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        // Игнорируем ошибки дубликатов (могут возникнуть при параллельном выполнении)
-                        // Логируем только если это не ошибка дубликата
-                        if (!ex.Message.Contains("PRIMARY KEY") && !ex.Message.Contains("duplicate"))
-                        {
-                            throw;
-                        }
-                    }
+                        PlaceId = place.Id,
+                        CategoryId = categoryId
+                    });
                 }
             }
 
             assignedCount++;
         }
 
-        // Сохраняем изменения с обработкой ошибок дубликатов
-        try
-        {
-            await _context.SaveChangesAsync();
-        }
-        catch (Microsoft.EntityFrameworkCore.DbUpdateException dbEx)
-        {
-            // Проверяем, является ли это ошибкой дубликата ключа
-            if (dbEx.InnerException != null && 
-                (dbEx.InnerException.Message.Contains("PRIMARY KEY") || 
-                 dbEx.InnerException.Message.Contains("duplicate") ||
-                 dbEx.InnerException.Message.Contains("повторяющийся ключ")))
-            {
-                // Это ошибка дубликата - пытаемся сохранить по одному
-                var entries = _context.ChangeTracker.Entries<PlaceCategory>()
-                    .Where(e => e.State == Microsoft.EntityFrameworkCore.EntityState.Added)
-                    .ToList();
-                
-                foreach (var entry in entries)
-                {
-                    try
-                    {
-                        var placeId = entry.Entity.PlaceId;
-                        var categoryId = entry.Entity.CategoryId;
-                        
-                        // Проверяем, существует ли уже такая связь
-                        var exists = await _context.PlaceCategories
-                            .AnyAsync(pc => pc.PlaceId == placeId && pc.CategoryId == categoryId);
-                        
-                        if (exists)
-                        {
-                            // Удаляем из контекста, если уже существует
-                            _context.Entry(entry.Entity).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
-                        }
-                    }
-                    catch
-                    {
-                        // Игнорируем отдельные ошибки
-                    }
-                }
-                
-                // Пытаемся сохранить оставшиеся изменения
-                try
-                {
-                    await _context.SaveChangesAsync();
-                }
-                catch
-                {
-                    // Если все еще есть ошибки, просто игнорируем их
-                    // Это не критично для работы приложения
-                }
-            }
-            else
-            {
-                // Это другая ошибка - пробрасываем дальше
-                throw;
-            }
-        }
+        await _context.SaveChangesAsync();
         }
         catch (Exception ex)
         {
@@ -575,11 +499,11 @@ public class PlaceService : IPlaceService
             Id = place.Id,
             Name = place.Name ?? string.Empty,
             Description = place.Description ?? string.Empty,
-            Type = place.Type,
             Address = place.Address,
             ImageUrl = place.ImageUrl,
             Latitude = place.Latitude,
             Longitude = place.Longitude,
+            Type = place.Type,
             Categories = place.PlaceCategories?
                 .Where(pc => pc.Category != null)
                 .Select(pc => pc.Category!.Name)
@@ -588,81 +512,6 @@ public class PlaceService : IPlaceService
             IsLiked = isLiked,
             LikesCount = place.Likes?.Count ?? 0
         };
-    }
-
-    public async Task<PlaceDto> UpdatePlaceAsync(int id, UpdatePlaceDto updatePlaceDto)
-    {
-        var place = await _context.Places
-            .Include(p => p.PlaceCategories)
-            .FirstOrDefaultAsync(p => p.Id == id);
-
-        if (place == null)
-        {
-            throw new ArgumentException($"Место с ID {id} не найдено");
-        }
-
-        // Обновляем основные поля
-        place.Name = updatePlaceDto.Name.Trim();
-        place.Description = updatePlaceDto.Description ?? string.Empty;
-        place.Address = updatePlaceDto.Address;
-        place.ImageUrl = updatePlaceDto.ImageUrl;
-        place.Latitude = updatePlaceDto.Latitude;
-        place.Longitude = updatePlaceDto.Longitude;
-        place.Type = updatePlaceDto.Type;
-        place.UpdatedAt = DateTime.UtcNow;
-
-        // Обновляем категории
-        if (updatePlaceDto.CategoryIds != null)
-        {
-            // Удаляем старые категории
-            var oldCategories = place.PlaceCategories.ToList();
-            _context.PlaceCategories.RemoveRange(oldCategories);
-
-            // Добавляем новые категории
-            foreach (var categoryId in updatePlaceDto.CategoryIds)
-            {
-                var categoryExists = await _context.Categories.AnyAsync(c => c.Id == categoryId);
-                if (categoryExists)
-                {
-                    _context.PlaceCategories.Add(new PlaceCategory
-                    {
-                        PlaceId = place.Id,
-                        CategoryId = categoryId
-                    });
-                }
-            }
-        }
-
-        await _context.SaveChangesAsync();
-
-        return await GetPlaceByIdAsync(place.Id) ?? throw new Exception("Место не найдено после обновления");
-    }
-
-    public async Task<bool> DeletePlaceAsync(int id)
-    {
-        var place = await _context.Places
-            .Include(p => p.PlaceCategories)
-            .Include(p => p.Favorites)
-            .Include(p => p.Likes)
-            .Include(p => p.Recommendations)
-            .FirstOrDefaultAsync(p => p.Id == id);
-
-        if (place == null)
-        {
-            return false;
-        }
-
-        // Удаляем все связи
-        _context.PlaceCategories.RemoveRange(place.PlaceCategories);
-        _context.Favorites.RemoveRange(place.Favorites);
-        _context.Likes.RemoveRange(place.Likes);
-        _context.Recommendations.RemoveRange(place.Recommendations);
-
-        // Удаляем само место
-        _context.Places.Remove(place);
-        await _context.SaveChangesAsync();
-
-        return true;
     }
 }
 

@@ -71,23 +71,7 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
     public async Task SyncPlacesAsync()
     {
         using var scope = _serviceProvider.CreateScope();
-        var predictHQService = scope.ServiceProvider.GetRequiredService<IPredictHQService>();
-
-        try
-        {
-            // Загружаем места из PredictHQ
-            _logger.LogInformation("🔄 Загрузка мест из PredictHQ...");
-            await predictHQService.LoadPlacesFromPredictHQAsync();
-            _logger.LogInformation("✅ Места из PredictHQ загружены успешно");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "❌ КРИТИЧЕСКАЯ ОШИБКА при загрузке мест из PredictHQ: {Message}", ex.Message);
-            _logger.LogError("Stack trace: {StackTrace}", ex.StackTrace);
-            // Продолжаем выполнение даже если один источник не работает
-            // Но логируем как ошибку, чтобы было видно в логах
-        }
-
+        
         try
         {
             // Присваиваем категории местам без категорий

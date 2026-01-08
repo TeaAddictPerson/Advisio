@@ -1,5 +1,11 @@
 namespace Advisio.API.Models;
 
+public enum UserRole
+{
+    User = 0,
+    Admin = 1
+}
+
 public class User
 {
     public int Id { get; set; }
@@ -15,11 +21,5 @@ public class User
     public ICollection<Like> Likes { get; set; } = new List<Like>();
     public ICollection<UserSurveyResponse> SurveyResponses { get; set; } = new List<UserSurveyResponse>();
     public ICollection<Recommendation> Recommendations { get; set; } = new List<Recommendation>();
-}
-
-public enum UserRole
-{
-    User = 0,
-    Admin = 1
 }
 
