@@ -87,6 +87,7 @@ public class PlacesController : ControllerBase
     public async Task<ActionResult> RecordView(int id, [FromQuery] int userId)
     {
         await _placeService.RecordPlaceViewAsync(userId, id);
+        await _placeService.MarkSubscriptionViewedAsync(userId, id);
         return Ok(new { message = "Просмотр записан" });
     }
 

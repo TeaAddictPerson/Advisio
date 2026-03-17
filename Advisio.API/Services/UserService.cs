@@ -91,21 +91,72 @@ public class UserService : IUserService
             .Take(10)
             .ToListAsync();
 
-        // Подписки пользователя
-        var subscriptions = new List<PlaceDto>();
+        // Подписки пользователя с флагом обновления (Place.UpdatedAt > LastViewedAt)
+        var subscriptionsWithUpdate = new List<SubscriptionWithUpdateDto>();
         try
         {
             var subs = await _context.PlaceSubscriptions
+                .Include(s => s.Place)
+                    .ThenInclude(p => p!.PlaceCategories)
+                    .ThenInclude(pc => pc.Category)
                 .Where(s => s.UserId == userId)
                 .OrderByDescending(s => s.SubscribedAt)
                 .ToListAsync();
             foreach (var sub in subs)
             {
                 var p = await _placeService.GetPlaceByIdAsync(sub.PlaceId, userId, includeExpiredEvents: true);
-                if (p != null) subscriptions.Add(p);
+                if (p == null && sub.Place != null)
+                {
+                    // Fallback: GetPlaceByIdAsync вернул null (напр. место удалено или истекло) — строим минимальный DTO из sub.Place
+                    p = new PlaceDto
+                    {
+                        Id = sub.Place.Id,
+                        Name = sub.Place.Name ?? "Без названия",
+                        Description = sub.Place.Description ?? "",
+                        Address = sub.Place.Address,
+                        ImageUrl = sub.Place.ImageUrl,
+                        Latitude = sub.Place.Latitude,
+                        Longitude = sub.Place.Longitude,
+                        Type = sub.Place.Type,
+                        Categories = sub.Place.PlaceCategories?
+                            .Where(pc => pc.Category != null)
+                            .Select(pc => pc.Category!.Name ?? "")
+                            .ToList() ?? new List<string>(),
+                        IsFavorite = false,
+                        IsLiked = false,
+                        LikesCount = sub.Place.Likes?.Count ?? 0,
+                    };
+                }
+                if (p != null)
+                {
+                    var placeUpdatedAt = sub.Place?.UpdatedAt;
+                    // Индикатор: пользователь ещё не смотрел после подписки ИЛИ место обновлено после последнего просмотра
+                    var hasUpdate = sub.LastViewedAt == null ||
+                        (placeUpdatedAt != null && placeUpdatedAt > sub.LastViewedAt);
+                    subscriptionsWithUpdate.Add(new SubscriptionWithUpdateDto { Place = p, HasUpdate = hasUpdate });
+                }
             }
         }
-        catch { /* PlaceSubscriptions может отсутствовать */ }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"GetProfileStats subscriptions error: {ex.Message}");
+            // Fallback: простой запрос без LastViewedAt (если колонка отсутствует)
+            try
+            {
+                var subPlaceIds = await _context.PlaceSubscriptions
+                    .Where(s => s.UserId == userId)
+                    .OrderByDescending(s => s.SubscribedAt)
+                    .Select(s => s.PlaceId)
+                    .ToListAsync();
+                foreach (var placeId in subPlaceIds)
+                {
+                    var p = await _placeService.GetPlaceByIdAsync(placeId, userId, includeExpiredEvents: true);
+                    if (p != null)
+                        subscriptionsWithUpdate.Add(new SubscriptionWithUpdateDto { Place = p, HasUpdate = true }); // без LastViewedAt считаем «есть обновление»
+                }
+            }
+            catch { /* Игнорируем */ }
+        }
 
         // Посещённые места
         var visited = await _placeService.GetUserVisitedPlacesAsync(userId);
@@ -230,7 +281,8 @@ public class UserService : IUserService
         {
             MostViewedPlaces = mostViewedPlaces,
             TopFilters = topFilters,
-            Subscriptions = subscriptions,
+            Subscriptions = subscriptionsWithUpdate.Select(x => x.Place).ToList(),
+            SubscriptionsWithUpdate = subscriptionsWithUpdate,
             VisitedPlaces = visited,
             TopCategories = topCategories,
             TopPlaceTypes = topPlaceTypes,

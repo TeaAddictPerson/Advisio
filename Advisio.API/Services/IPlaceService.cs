@@ -27,5 +27,6 @@ public interface IPlaceService
     Task<bool> MarkPlaceVisitedAsync(int userId, int placeId);
     Task<bool> UnmarkPlaceVisitedAsync(int userId, int placeId);
     Task<List<PlaceDto>> GetUserVisitedPlacesAsync(int userId);
+    Task MarkSubscriptionViewedAsync(int userId, int placeId);
 }
 

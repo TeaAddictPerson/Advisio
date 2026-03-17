@@ -5,6 +5,8 @@ public class ProfileStatsDto
     public List<MostViewedPlaceDto> MostViewedPlaces { get; set; } = new();
     public List<TopFilterDto> TopFilters { get; set; } = new();
     public List<PlaceDto> Subscriptions { get; set; } = new();
+    /// <summary>Подписки с флагом HasUpdate для оранжевого индикатора</summary>
+    public List<SubscriptionWithUpdateDto> SubscriptionsWithUpdate { get; set; } = new();
     public List<PlaceDto> VisitedPlaces { get; set; } = new();
     public List<TopCategoryDto> TopCategories { get; set; } = new();
     /// <summary>Любимые типы отдыха (Place.Type) по количеству просмотров</summary>
@@ -56,4 +58,11 @@ public class TopFilterDto
     public string FilterType { get; set; } = string.Empty;
     public string FilterValue { get; set; } = string.Empty;
     public int UsageCount { get; set; }
+}
+
+/// <summary>Подписка с флагом «есть обновления» (Place.UpdatedAt > LastViewedAt)</summary>
+public class SubscriptionWithUpdateDto
+{
+    public PlaceDto Place { get; set; } = null!;
+    public bool HasUpdate { get; set; }
 }

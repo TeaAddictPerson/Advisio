@@ -1,9 +1,31 @@
-import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, ChevronRight, Lock, Globe } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { MapPin, ChevronRight, Lock, Globe, Pencil, ImagePlus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Place } from "@/components/PlaceCard";
 
@@ -16,15 +38,142 @@ interface CollectionItem {
 
 const CollectionDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const [collection, setCollection] = useState<{ id: number; name: string; description?: string; items: CollectionItem[] } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editNoteOpen, setEditNoteOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<CollectionItem | null>(null);
+  const [noteText, setNoteText] = useState("");
+  const [notePhotoUrls, setNotePhotoUrls] = useState<string[]>([]);
+  const [isNotePublic, setIsNotePublic] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editCollectionOpen, setEditCollectionOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (id && user) {
       loadCollection(parseInt(id));
     }
   }, [id, user?.id]);
+
+  const openEditNote = (item: CollectionItem) => {
+    setEditingItem(item);
+    setNoteText(item.note || "");
+    setNotePhotoUrls(item.notePhotoUrls || []);
+    setIsNotePublic(item.isNotePublic || false);
+    setEditNoteOpen(true);
+  };
+
+  const handleSaveNote = async () => {
+    if (!collection || !editingItem || !user) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/Collections/${collection.id}/places/${editingItem.place.id}/note?userId=${user.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ note: noteText || null, notePhotoUrls, isNotePublic }),
+      });
+      if (res.ok) {
+        toast.success("Заметка сохранена");
+        setEditNoteOpen(false);
+        loadCollection(collection.id);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err?.error || "Не удалось сохранить заметку");
+      }
+    } catch {
+      toast.error("Ошибка при сохранении");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddPhoto = () => fileInputRef.current?.click();
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith("image/")) {
+        toast.error("Выберите изображение (jpg, png, gif...)");
+        continue;
+      }
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/Images/upload", { method: "POST", credentials: "include", body: formData });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url) {
+            setNotePhotoUrls((prev) => [...prev, data.url]);
+            toast.success("Фото добавлено");
+          }
+        } else {
+          const err = await res.json().catch(() => ({}));
+          toast.error(err?.error || "Не удалось загрузить фото");
+        }
+      } catch {
+        toast.error("Ошибка при загрузке");
+      }
+    }
+    e.target.value = "";
+  };
+
+  const removePhotoUrl = (index: number) => setNotePhotoUrls((prev) => prev.filter((_, i) => i !== index));
+
+  const openEditCollection = () => {
+    setEditName(collection!.name);
+    setEditDesc(collection!.description || "");
+    setEditCollectionOpen(true);
+  };
+
+  const handleSaveCollection = async () => {
+    if (!collection || !user || !editName.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/Collections/${collection.id}?userId=${user.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: editName.trim(), description: editDesc.trim() || null }),
+      });
+      if (res.ok) {
+        toast.success("Коллекция обновлена");
+        setEditCollectionOpen(false);
+        setCollection((c) => c ? { ...c, name: editName.trim(), description: editDesc.trim() || undefined } : null);
+      } else {
+        toast.error("Не удалось сохранить");
+      }
+    } catch {
+      toast.error("Ошибка при сохранении");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteCollection = async () => {
+    if (!collection || !user) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/Collections/${collection.id}?userId=${user.id}`, { method: "DELETE", credentials: "include" });
+      if (res.ok) {
+        toast.success("Коллекция удалена");
+        navigate("/profile");
+      } else {
+        toast.error("Не удалось удалить");
+      }
+    } catch {
+      toast.error("Ошибка при удалении");
+    } finally {
+      setSaving(false);
+      setDeleteConfirmOpen(false);
+    }
+  };
 
   const loadCollection = async (collectionId: number) => {
     setLoading(true);
@@ -123,11 +272,21 @@ const CollectionDetail = () => {
         </nav>
 
         <Card variant="elevated" className="mb-6">
-          <CardHeader>
-            <h1 className="text-2xl md:text-3xl font-display font-bold">{collection.name}</h1>
-            {collection.description && (
-              <p className="text-muted-foreground">{collection.description}</p>
-            )}
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div className="flex-1">
+              <h1 className="text-2xl md:text-3xl font-display font-bold">{collection.name}</h1>
+              {collection.description && (
+                <p className="text-muted-foreground">{collection.description}</p>
+              )}
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={openEditCollection} className="gap-1">
+                <Pencil className="h-4 w-4" /> Редактировать
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setDeleteConfirmOpen(true)} className="gap-1 text-destructive hover:text-destructive">
+                <Trash2 className="h-4 w-4" /> Удалить
+              </Button>
+            </div>
           </CardHeader>
         </Card>
 
@@ -149,12 +308,16 @@ const CollectionDetail = () => {
                   )}
                 </div>
                 <CardContent className="flex-1 p-6">
-                  <div className="mb-2">
+                  <div className="flex justify-between items-start mb-2">
                     <Link to={`/place/${item.place.id}`}>
                       <h3 className="text-xl font-semibold hover:text-primary transition-colors">
                         {item.place.name}
                       </h3>
                     </Link>
+                    <Button variant="ghost" size="sm" onClick={() => openEditNote(item)} className="gap-1">
+                      <Pencil className="h-4 w-4" />
+                      {item.note || item.notePhotoUrls?.length ? "Редактировать заметку" : "Добавить заметку"}
+                    </Button>
                   </div>
                   <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
                     {item.place.description?.substring(0, 150)}...
@@ -180,7 +343,9 @@ const CollectionDetail = () => {
                       )}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground italic">Нет заметки</p>
+                    <p className="text-sm text-muted-foreground italic">
+                      Нет заметки. Нажмите «Заметка» чтобы добавить планы.
+                    </p>
                   )}
                   <Link to={`/place/${item.place.id}`} className="inline-block mt-3 text-sm text-primary">
                     Подробнее о месте →
@@ -199,6 +364,113 @@ const CollectionDetail = () => {
             </Link>
           </div>
         )}
+
+        <Dialog open={editNoteOpen} onOpenChange={setEditNoteOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Заметка о месте</DialogTitle>
+            </DialogHeader>
+            {editingItem && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">Место: {editingItem.place.name}</p>
+                <div>
+                  <Label>Текст заметки (планы, идеи)</Label>
+                  <Textarea
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    placeholder="Например: взять билеты заранее, прийти к 18:00..."
+                    rows={4}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="flex items-center gap-2 mb-2">
+                    <ImagePlus className="h-4 w-4" />
+                    Фото с компьютера
+                  </Label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {notePhotoUrls.map((url, i) => (
+                      <div key={i} className="relative group">
+                        <img src={url} alt="" className="w-20 h-20 object-cover rounded" />
+                        <button
+                          type="button"
+                          onClick={() => removePhotoUrl(i)}
+                          className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleAddPhoto}
+                      className="w-20 h-20 rounded border-2 border-dashed border-muted-foreground/30 flex items-center justify-center hover:border-primary/50"
+                    >
+                      <ImagePlus className="h-6 w-6 text-muted-foreground" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch id="public" checked={isNotePublic} onCheckedChange={setIsNotePublic} />
+                  <Label htmlFor="public">
+                    {isNotePublic ? "Публичная — видна в профиле" : "Приватная — только для вас"}
+                  </Label>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditNoteOpen(false)}>Отмена</Button>
+              <Button onClick={handleSaveNote} disabled={saving}>{saving ? "Сохранение..." : "Сохранить"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={editCollectionOpen} onOpenChange={setEditCollectionOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Редактировать коллекцию</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Название</Label>
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Название" required />
+              </div>
+              <div>
+                <Label>Описание</Label>
+                <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Описание" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditCollectionOpen(false)}>Отмена</Button>
+              <Button onClick={handleSaveCollection} disabled={saving || !editName.trim()}>{saving ? "Сохранение..." : "Сохранить"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Удалить коллекцию?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Коллекция «{collection.name}» и все заметки будут удалены безвозвратно.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Отмена</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteCollection} disabled={saving} className="bg-destructive text-destructive-foreground">
+                {saving ? "Удаление..." : "Удалить"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

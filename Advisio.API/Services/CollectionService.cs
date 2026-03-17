@@ -84,6 +84,28 @@ public class CollectionService : ICollectionService
         return (await GetCollectionByIdAsync(collection.Id, userId))!;
     }
 
+    public async Task<PlaceCollectionDto?> UpdateCollectionAsync(int id, int userId, UpdateCollectionDto dto)
+    {
+        var collection = await _context.PlaceCollections.FirstOrDefaultAsync(c => c.Id == id && c.UserId == userId);
+        if (collection == null) return null;
+
+        collection.Name = dto.Name.Trim();
+        collection.Description = dto.Description?.Trim();
+        collection.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return await GetCollectionByIdAsync(id, userId);
+    }
+
+    public async Task<bool> DeleteCollectionAsync(int id, int userId)
+    {
+        var collection = await _context.PlaceCollections.FirstOrDefaultAsync(c => c.Id == id && c.UserId == userId);
+        if (collection == null) return false;
+
+        _context.PlaceCollections.Remove(collection);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
     public async Task<bool> AddPlaceToCollectionAsync(int collectionId, int placeId, int userId)
     {
         var collection = await _context.PlaceCollections.FirstOrDefaultAsync(c => c.Id == collectionId && c.UserId == userId);
@@ -118,6 +140,22 @@ public class CollectionService : ICollectionService
         if (item == null) return false;
 
         _context.PlaceCollectionItems.Remove(item);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> UpdateCollectionItemNoteAsync(int collectionId, int placeId, int userId, string? note, string? notePhotoUrls, bool isNotePublic)
+    {
+        var collection = await _context.PlaceCollections.FirstOrDefaultAsync(c => c.Id == collectionId && c.UserId == userId);
+        if (collection == null) return false;
+
+        var item = await _context.PlaceCollectionItems
+            .FirstOrDefaultAsync(i => i.CollectionId == collectionId && i.PlaceId == placeId);
+        if (item == null) return false;
+
+        item.Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        item.NotePhotoUrls = notePhotoUrls;
+        item.IsNotePublic = isNotePublic;
         await _context.SaveChangesAsync();
         return true;
     }

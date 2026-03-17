@@ -11,9 +11,19 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Eye, EyeOff, User, Heart, Star, LogOut, FolderOpen, BarChart3, Bell, MapPin, TrendingUp, Camera, ChevronLeft, ChevronRight } from "lucide-react";
+import { Eye, EyeOff, User, Heart, Star, LogOut, FolderOpen, BarChart3, Bell, MapPin, TrendingUp, Camera, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import useEmblaCarousel from "embla-carousel-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -117,6 +127,7 @@ const Profile = () => {
     mostViewed: Array<{ place: Place; viewCount: number }>;
     topFilters: Array<{ filterType: string; filterValue: string; usageCount: number }>;
     subscriptions?: Place[];
+    subscriptionsWithUpdate?: Array<{ place: Place; hasUpdate: boolean }>;
     visitedPlaces?: Place[];
     topCategories?: Array<{ categoryName: string; type?: string; visitCount: number; placesCount: number }>;
     topPlaceTypes?: Array<{ typeName: string; viewCount: number; placesCount: number }>;
@@ -126,6 +137,69 @@ const Profile = () => {
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState("");
   const [newCollectionDesc, setNewCollectionDesc] = useState("");
+  const [editCollectionOpen, setEditCollectionOpen] = useState(false);
+  const [editingCollection, setEditingCollection] = useState<{ id: number; name: string; description?: string } | null>(null);
+  const [editColName, setEditColName] = useState("");
+  const [editColDesc, setEditColDesc] = useState("");
+  const [deleteCollectionOpen, setDeleteCollectionOpen] = useState(false);
+  const [deletingCollectionId, setDeletingCollectionId] = useState<number | null>(null);
+  const [savingCollection, setSavingCollection] = useState(false);
+
+  const openEditCollection = (col: { id: number; name: string; description?: string }) => {
+    setEditingCollection(col);
+    setEditColName(col.name);
+    setEditColDesc(col.description || "");
+    setEditCollectionOpen(true);
+  };
+
+  const handleSaveEditCollection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !editingCollection || !editColName.trim()) return;
+    setSavingCollection(true);
+    try {
+      const res = await fetch(`/api/Collections/${editingCollection.id}?userId=${user.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: editColName.trim(), description: editColDesc.trim() || null }),
+      });
+      if (res.ok) {
+        toast.success("Коллекция обновлена");
+        setEditCollectionOpen(false);
+        setEditingCollection(null);
+        loadCollections();
+      } else {
+        toast.error("Не удалось сохранить");
+      }
+    } catch {
+      toast.error("Ошибка при сохранении");
+    } finally {
+      setSavingCollection(false);
+    }
+  };
+
+  const handleDeleteCollection = async () => {
+    if (!user || !deletingCollectionId) return;
+    setSavingCollection(true);
+    try {
+      const res = await fetch(`/api/Collections/${deletingCollectionId}?userId=${user.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        toast.success("Коллекция удалена");
+        setDeleteCollectionOpen(false);
+        setDeletingCollectionId(null);
+        loadCollections();
+      } else {
+        toast.error("Не удалось удалить");
+      }
+    } catch {
+      toast.error("Ошибка при удалении");
+    } finally {
+      setSavingCollection(false);
+    }
+  };
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -239,23 +313,39 @@ const Profile = () => {
       if (res.ok) {
         const data = await res.json();
         const mapPlace = (p: any) => ({
-          id: p.id,
-          name: p.name || "Без названия",
-          description: p.description || "",
-          type: p.type || null,
-          address: p.address || null,
-          imageUrl: p.imageUrl || null,
-          latitude: p.latitude ? Number(p.latitude) : null,
-          longitude: p.longitude ? Number(p.longitude) : null,
-          likes: p.likesCount || 0,
-          categories: p.categories?.map((c: { name: string }) => c.name) || [],
-          isLiked: p.isLiked || false,
-          isFavorite: p.isFavorite || false,
+          id: p?.id ?? p?.Id,
+          name: (p?.name ?? p?.Name) || "Без названия",
+          description: p?.description ?? p?.Description ?? "",
+          type: p?.type ?? p?.Type ?? null,
+          address: p?.address ?? p?.Address ?? null,
+          imageUrl: p?.imageUrl ?? p?.ImageUrl ?? null,
+          latitude: (p?.latitude ?? p?.Latitude) != null ? Number(p?.latitude ?? p?.Latitude) : null,
+          longitude: (p?.longitude ?? p?.Longitude) != null ? Number(p?.longitude ?? p?.Longitude) : null,
+          likes: p?.likesCount ?? p?.LikesCount ?? 0,
+          categories: (p?.categories ?? p?.Categories)?.map((c: any) => c?.name ?? c?.Name) || [],
+          isLiked: p?.isLiked ?? p?.IsLiked ?? false,
+          isFavorite: p?.isFavorite ?? p?.IsFavorite ?? false,
         });
+        const subs = data.subscriptions ?? data.Subscriptions ?? [];
+        const subsWithUpdateRaw = data.subscriptionsWithUpdate ?? data.SubscriptionsWithUpdate ?? [];
+        const subsWithUpdate = subsWithUpdateRaw.length > 0
+          ? subsWithUpdateRaw.map((x: any) => ({
+              place: mapPlace(x.place ?? x.Place),
+              hasUpdate: x.hasUpdate ?? x.HasUpdate ?? false,
+            }))
+          : subs.map((p: any) => ({ place: mapPlace(p), hasUpdate: true })); // fallback: показываем индикатор, т.к. нет данных LastViewedAt
         setStats({
-          mostViewed: (data.mostViewedPlaces || []).map((m: any) => ({ place: mapPlace(m.place), viewCount: m.viewCount })),
-          topFilters: (data.topFilters || []).map((f: any) => ({ filterType: f.filterType, filterValue: f.filterValue, usageCount: f.usageCount })),
-          subscriptions: (data.subscriptions || []).map(mapPlace),
+          mostViewed: (data.mostViewedPlaces ?? data.MostViewedPlaces ?? []).map((m: any) => ({
+            place: mapPlace(m.place ?? m.Place),
+            viewCount: m.viewCount ?? m.ViewCount ?? 0,
+          })),
+          topFilters: (data.topFilters ?? data.TopFilters ?? []).map((f: any) => ({
+            filterType: f.filterType ?? f.FilterType,
+            filterValue: f.filterValue ?? f.FilterValue,
+            usageCount: f.usageCount ?? f.UsageCount ?? 0,
+          })),
+          subscriptions: subs.map(mapPlace),
+          subscriptionsWithUpdate: subsWithUpdate,
           visitedPlaces: (data.visitedPlaces || []).map(mapPlace),
           topCategories: (data.topCategories || []).map((c: any) => ({ categoryName: c.categoryName, type: c.type, visitCount: c.visitCount, placesCount: c.placesCount })),
           topPlaceTypes: (data.topPlaceTypes || []).map((t: any) => ({ typeName: t.typeName, viewCount: t.viewCount, placesCount: t.placesCount })),
@@ -596,23 +686,38 @@ const Profile = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Bell className="h-5 w-5 text-primary" />
-                Подписки ({stats?.subscriptions?.length ?? 0})
+                Подписки ({stats?.subscriptionsWithUpdate?.length ?? stats?.subscriptions?.length ?? 0})
               </CardTitle>
               <p className="text-sm text-muted-foreground">Места, на которые вы подписаны — обновления будут видны здесь</p>
             </CardHeader>
             <CardContent>
-              {stats?.subscriptions && stats.subscriptions.length > 0 ? (
+              {(() => {
+                const subList = (stats?.subscriptionsWithUpdate && stats.subscriptionsWithUpdate.length > 0)
+                  ? stats.subscriptionsWithUpdate
+                  : (stats?.subscriptions || []).map((p) => ({ place: p, hasUpdate: true }));
+                return subList.length > 0 ? (
                 <div className="space-y-2">
-                  {stats.subscriptions.map((place) => (
+                  {subList.map(({ place, hasUpdate }) => (
                     <Link key={place.id} to={`/place/${place.id}`} className="flex justify-between items-center p-2 rounded hover:bg-muted/50">
-                      <span>{place.name}</span>
+                      <span className="flex items-center gap-2">
+                        {place.name}
+                        {(hasUpdate !== false) && (
+                          <span
+                            className="shrink-0 inline-block rounded-full border-2 border-background"
+                            style={{ width: 10, height: 10, backgroundColor: "#f97316", minWidth: 10, minHeight: 10 }}
+                            title="Есть обновления"
+                            aria-label="Есть обновления"
+                          />
+                        )}
+                      </span>
                       <span className="text-sm text-muted-foreground">→</span>
                     </Link>
                   ))}
                 </div>
               ) : (
                 <p className="text-muted-foreground text-center py-4">У вас пока нет подписок на места</p>
-              )}
+              );
+            })()}
             </CardContent>
           </Card>
 
@@ -665,9 +770,19 @@ const Profile = () => {
                 <div className="space-y-4">
                   {collections.map((col) => (
                     <div key={col.id} className="p-4 rounded-lg border border-border">
-                      <Link to={`/collection/${col.id}`} className="block hover:opacity-80">
-                        <h4 className="font-semibold mb-1">{col.name}</h4>
-                      </Link>
+                      <div className="flex justify-between items-start mb-1">
+                        <Link to={`/collection/${col.id}`} className="block hover:opacity-80 flex-1">
+                          <h4 className="font-semibold">{col.name}</h4>
+                        </Link>
+                        <div className="flex gap-1 shrink-0">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditCollection(col)} title="Редактировать">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDeletingCollectionId(col.id); setDeleteCollectionOpen(true); }} title="Удалить">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                       {col.description && <p className="text-sm text-muted-foreground mb-2">{col.description}</p>}
                       <div className="space-y-2">
                         {col.places.map((place) => (
@@ -793,6 +908,47 @@ const Profile = () => {
               </form>
             </DialogContent>
           </Dialog>
+
+          <Dialog open={editCollectionOpen} onOpenChange={setEditCollectionOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Редактировать коллекцию</DialogTitle>
+              </DialogHeader>
+              {editingCollection && (
+                <form onSubmit={handleSaveEditCollection} className="space-y-4">
+                  <div>
+                    <Label>Название</Label>
+                    <Input value={editColName} onChange={(e) => setEditColName(e.target.value)} placeholder="Название" required />
+                  </div>
+                  <div>
+                    <Label>Описание (необязательно)</Label>
+                    <Input value={editColDesc} onChange={(e) => setEditColDesc(e.target.value)} placeholder="Описание" />
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setEditCollectionOpen(false)}>Отмена</Button>
+                    <Button type="submit" disabled={savingCollection}>{savingCollection ? "Сохранение..." : "Сохранить"}</Button>
+                  </DialogFooter>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          <AlertDialog open={deleteCollectionOpen} onOpenChange={setDeleteCollectionOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Удалить коллекцию?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {deletingCollectionId ? `Коллекция «${collections.find((c) => c.id === deletingCollectionId)?.name ?? ""}» будет удалена безвозвратно.` : "Все места останутся в каталоге."}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Отмена</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteCollection} disabled={savingCollection} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  {savingCollection ? "Удаление..." : "Удалить"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     </Layout>

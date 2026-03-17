@@ -24,3 +24,16 @@ public class CreateCollectionDto
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
 }
+
+public class UpdateCollectionDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+}
+
+public class UpdateCollectionItemNoteDto
+{
+    public string? Note { get; set; }
+    public List<string>? NotePhotoUrls { get; set; }
+    public bool IsNotePublic { get; set; }
+}

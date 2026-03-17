@@ -11,4 +11,6 @@ public class PlaceSubscription
     public int PlaceId { get; set; }
     public Place Place { get; set; } = null!;
     public DateTime SubscribedAt { get; set; } = DateTime.UtcNow;
+    /// <summary>Когда пользователь последний раз просматривал место — для индикатора обновлений</summary>
+    public DateTime? LastViewedAt { get; set; }
 }

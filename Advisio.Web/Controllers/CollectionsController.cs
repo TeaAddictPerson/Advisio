@@ -37,6 +37,40 @@ public class CollectionsController : ControllerBase
         return CreatedAtAction(nameof(GetCollection), new { id = collection.Id, userId }, collection);
     }
 
+    [HttpPut("{id}")]
+    public async Task<ActionResult<PlaceCollectionDto>> UpdateCollection(int id, [FromQuery] int userId, [FromBody] UpdateCollectionDto dto)
+    {
+        var collection = await _collectionService.UpdateCollectionAsync(id, userId, dto);
+        if (collection == null) return NotFound();
+        return Ok(collection);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> DeleteCollection(int id, [FromQuery] int userId)
+    {
+        var result = await _collectionService.DeleteCollectionAsync(id, userId);
+        if (!result) return NotFound();
+        return Ok(new { message = "Коллекция удалена" });
+    }
+
+    [HttpPut("{collectionId}/places/{placeId}/note")]
+    public async Task<ActionResult> UpdateItemNote(int collectionId, int placeId, [FromQuery] int userId, [FromBody] UpdateCollectionItemNoteDto? dto)
+    {
+        if (dto == null) return BadRequest(new { error = "Тело запроса обязательно" });
+        try
+        {
+            var noteUrls = dto.NotePhotoUrls != null && dto.NotePhotoUrls.Count > 0
+                ? System.Text.Json.JsonSerializer.Serialize(dto.NotePhotoUrls) : null;
+            var result = await _collectionService.UpdateCollectionItemNoteAsync(collectionId, placeId, userId, dto.Note, noteUrls, dto.IsNotePublic);
+            if (!result) return BadRequest(new { error = "Коллекция или место не найдено" });
+            return Ok(new { message = "Заметка обновлена" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = $"Ошибка сохранения: {ex.Message}" });
+        }
+    }
+
     [HttpPost("{collectionId}/places/{placeId}")]
     public async Task<ActionResult> AddPlace(int collectionId, int placeId, [FromQuery] int userId)
     {

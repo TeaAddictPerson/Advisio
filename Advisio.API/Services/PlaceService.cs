@@ -565,6 +565,21 @@ public class PlaceService : IPlaceService
         return true;
     }
 
+    public async Task MarkSubscriptionViewedAsync(int userId, int placeId)
+    {
+        try
+        {
+            var sub = await _context.PlaceSubscriptions
+                .FirstOrDefaultAsync(s => s.UserId == userId && s.PlaceId == placeId);
+            if (sub != null)
+            {
+                sub.LastViewedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+        }
+        catch { /* LastViewedAt может отсутствовать до применения миграции */ }
+    }
+
     public async Task<bool> MarkPlaceVisitedAsync(int userId, int placeId)
     {
         if (!await _context.Places.AnyAsync(p => p.Id == placeId)) return false;
