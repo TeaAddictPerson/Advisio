@@ -32,6 +32,7 @@ builder.Services.AddDbContext<AdvisioDbContext>(options =>
 
 // Services
 builder.Services.AddScoped<IPlaceService, PlaceService>();
+builder.Services.AddScoped<ICollectionService, CollectionService>();
 builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 builder.Services.AddScoped<ISurveyService, SurveyService>();
 builder.Services.AddScoped<IUserService, UserService>();

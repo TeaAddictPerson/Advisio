@@ -32,6 +32,36 @@ public class CategoriesController : ControllerBase
 
         return Ok(categories);
     }
+
+    [HttpPost("{id}/subscribe")]
+    public async Task<ActionResult> SubscribeToCategory(int id, [FromQuery] int userId)
+    {
+        if (!await _context.Categories.AnyAsync(c => c.Id == id)) return NotFound();
+        if (!await _context.Users.AnyAsync(u => u.Id == userId)) return NotFound();
+        if (await _context.CategorySubscriptions.AnyAsync(s => s.UserId == userId && s.CategoryId == id))
+            return BadRequest("Уже подписаны");
+
+        _context.CategorySubscriptions.Add(new CategorySubscription
+        {
+            UserId = userId,
+            CategoryId = id,
+            SubscribedAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Подписка на категорию оформлена" });
+    }
+
+    [HttpDelete("{id}/subscribe")]
+    public async Task<ActionResult> UnsubscribeFromCategory(int id, [FromQuery] int userId)
+    {
+        var sub = await _context.CategorySubscriptions
+            .FirstOrDefaultAsync(s => s.UserId == userId && s.CategoryId == id);
+        if (sub == null) return NotFound();
+
+        _context.CategorySubscriptions.Remove(sub);
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Подписка отменена" });
+    }
 }
 
 public class CategoryDto

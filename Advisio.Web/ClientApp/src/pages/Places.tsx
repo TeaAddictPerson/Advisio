@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import PlaceCard from "@/components/PlaceCard";
 import PlaceFilters from "@/components/PlaceFilters";
@@ -352,17 +352,23 @@ const Places = () => {
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <Button
-                  key={page}
-                  variant={page === currentPage ? "default" : "outline"}
-                  size="icon"
-                  onClick={() => setCurrentPage(page)}
-                  disabled={loading}
-                >
-                  {page}
-                </Button>
-              ))}
+              {(() => {
+                const PAGE_WINDOW = 5;
+                const start = Math.max(1, Math.min(currentPage, totalPages - PAGE_WINDOW + 1));
+                const end = Math.min(totalPages, start + PAGE_WINDOW - 1);
+                const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+                return pages.map((page) => (
+                  <Button
+                    key={page}
+                    variant={page === currentPage ? "default" : "outline"}
+                    size="icon"
+                    onClick={() => setCurrentPage(page)}
+                    disabled={loading}
+                  >
+                    {page}
+                  </Button>
+                ));
+              })()}
               <Button
                 variant="outline"
                 size="icon"

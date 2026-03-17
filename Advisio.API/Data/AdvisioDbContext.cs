@@ -20,6 +20,15 @@ public class AdvisioDbContext : DbContext
     public DbSet<SurveyAnswer> SurveyAnswers { get; set; }
     public DbSet<UserSurveyResponse> UserSurveyResponses { get; set; }
     public DbSet<Recommendation> Recommendations { get; set; }
+    public DbSet<PlaceCollection> PlaceCollections { get; set; }
+    public DbSet<PlaceCollectionItem> PlaceCollectionItems { get; set; }
+    public DbSet<PlaceView> PlaceViews { get; set; }
+    public DbSet<PlaceReview> PlaceReviews { get; set; }
+    public DbSet<PlaceSubscription> PlaceSubscriptions { get; set; }
+    public DbSet<CategorySubscription> CategorySubscriptions { get; set; }
+    public DbSet<UserFilterUsage> UserFilterUsages { get; set; }
+    public DbSet<PlaceVisit> PlaceVisits { get; set; }
+    public DbSet<PlaceComment> PlaceComments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,6 +84,26 @@ public class AdvisioDbContext : DbContext
 
         modelBuilder.Entity<Recommendation>()
             .HasIndex(r => new { r.UserId, r.PlaceId })
+            .IsUnique();
+
+        // Уникальность отзыва: один пользователь — один отзыв на место
+        modelBuilder.Entity<PlaceReview>()
+            .HasIndex(pr => new { pr.UserId, pr.PlaceId })
+            .IsUnique();
+
+        // Уникальность подписки на место
+        modelBuilder.Entity<PlaceSubscription>()
+            .HasIndex(ps => new { ps.UserId, ps.PlaceId })
+            .IsUnique();
+
+        // Уникальность подписки на категорию
+        modelBuilder.Entity<CategorySubscription>()
+            .HasIndex(cs => new { cs.UserId, cs.CategoryId })
+            .IsUnique();
+
+        // Уникальность посещения: один пользователь — одно посещение места (можно обновлять дату)
+        modelBuilder.Entity<PlaceVisit>()
+            .HasIndex(pv => new { pv.UserId, pv.PlaceId })
             .IsUnique();
     }
 }

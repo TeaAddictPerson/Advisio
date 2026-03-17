@@ -38,5 +38,19 @@ public class UsersController : ControllerBase
             return NotFound(new { error = ex.Message });
         }
     }
+
+    [HttpGet("{id}/stats")]
+    public async Task<ActionResult<ProfileStatsDto>> GetProfileStats(int id)
+    {
+        try
+        {
+            var stats = await _userService.GetProfileStatsAsync(id);
+            return Ok(stats);
+        }
+        catch (ArgumentException)
+        {
+            return NotFound();
+        }
+    }
 }
 

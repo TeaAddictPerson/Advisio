@@ -38,15 +38,18 @@ public class RecommendationService : IRecommendationService
 
         if (existingRecommendations.Any())
         {
-            return existingRecommendations.Select(r => new RecommendationDto
+            var list = new List<RecommendationDto>();
+            foreach (var r in existingRecommendations)
             {
-                Id = r.Id,
-                Place = _placeService.GetPlaceByIdAsync(r.PlaceId, userId).Result!,
-                Score = r.Score,
-                Reason = r.Reason,
-                CreatedAt = r.CreatedAt,
-                IsViewed = r.IsViewed
-            }).ToList();
+                var place = await _placeService.GetPlaceByIdAsync(r.PlaceId, userId);
+                if (place != null)
+                    list.Add(new RecommendationDto { Id = r.Id, Place = place, Score = r.Score, Reason = r.Reason, CreatedAt = r.CreatedAt, IsViewed = r.IsViewed });
+            }
+            // Сначала места с оценкой (AverageRating != null), затем по убыванию Score
+            return list.OrderByDescending(x => x.Place.AverageRating.HasValue ? 1 : 0)
+                .ThenByDescending(x => x.Place.AverageRating ?? 0)
+                .ThenByDescending(x => x.Score)
+                .ToList();
         }
 
         // Если рекомендаций нет, генерируем их
@@ -65,15 +68,17 @@ public class RecommendationService : IRecommendationService
                 .ThenInclude(p => p.Likes)
             .ToListAsync();
 
-        return newRecommendations.Select(r => new RecommendationDto
+        var newList = new List<RecommendationDto>();
+        foreach (var r in newRecommendations)
         {
-            Id = r.Id,
-            Place = _placeService.GetPlaceByIdAsync(r.PlaceId, userId).Result!,
-            Score = r.Score,
-            Reason = r.Reason,
-            CreatedAt = r.CreatedAt,
-            IsViewed = r.IsViewed
-        }).ToList();
+            var place = await _placeService.GetPlaceByIdAsync(r.PlaceId, userId);
+            if (place != null)
+                newList.Add(new RecommendationDto { Id = r.Id, Place = place, Score = r.Score, Reason = r.Reason, CreatedAt = r.CreatedAt, IsViewed = r.IsViewed });
+        }
+        return newList.OrderByDescending(x => x.Place.AverageRating.HasValue ? 1 : 0)
+            .ThenByDescending(x => x.Place.AverageRating ?? 0)
+            .ThenByDescending(x => x.Score)
+            .ToList();
     }
 
     public async Task GenerateRecommendationsAsync(int userId)
@@ -125,10 +130,12 @@ public class RecommendationService : IRecommendationService
 
         if (!suitableCategories.Any()) return;
 
-        // Получаем места, которые относятся к подходящим категориям
+        // Получаем места, которые относятся к подходящим категориям (исключаем истёкшие мероприятия)
+        var today = DateTime.UtcNow.Date;
         var recommendedPlaces = await _context.PlaceCategories
             .Where(pc => suitableCategories.Contains(pc.CategoryId))
             .Select(pc => pc.Place)
+            .Where(p => p.EventEndDate == null || p.EventEndDate >= today)
             .Distinct()
             .Include(p => p.PlaceCategories)
                 .ThenInclude(pc => pc.Category)
@@ -198,9 +205,11 @@ public class RecommendationService : IRecommendationService
         // Для каждой категории берем несколько мест
         foreach (var categoryGroup in categoriesByType)
         {
+            var today = DateTime.UtcNow.Date;
             var placesInCategory = await _context.PlaceCategories
                 .Where(pc => categoryGroup.Select(c => c.Id).Contains(pc.CategoryId))
                 .Select(pc => pc.Place)
+                .Where(p => p.EventEndDate == null || p.EventEndDate >= today)
                 .Distinct()
                 .Take(3) // По 3 места из каждой категории
                 .ToListAsync();

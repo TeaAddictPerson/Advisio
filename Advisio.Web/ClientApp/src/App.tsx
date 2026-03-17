@@ -12,6 +12,7 @@ import Survey from "./pages/Survey";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
+import CollectionDetail from "./pages/CollectionDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/collection/:id" element={<CollectionDetail />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -6,5 +6,6 @@ public interface IUserService
 {
     Task<UserProfileDto> GetUserProfileAsync(int userId);
     Task<UserDto?> GetUserByIdAsync(int id);
+    Task<ProfileStatsDto> GetProfileStatsAsync(int userId);
 }
 

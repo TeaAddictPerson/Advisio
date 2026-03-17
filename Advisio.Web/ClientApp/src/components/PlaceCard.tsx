@@ -18,6 +18,10 @@ export interface Place {
   categories: string[];
   isLiked?: boolean;
   isFavorite?: boolean;
+  averageRating?: number;
+  reviewsCount?: number;
+  isSubscribed?: boolean;
+  isVisited?: boolean;
 }
 
 interface PlaceCardProps {

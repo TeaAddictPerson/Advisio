@@ -10,6 +10,7 @@ public class Category
 
     // Навигационные свойства
     public ICollection<PlaceCategory> PlaceCategories { get; set; } = new List<PlaceCategory>();
+    public ICollection<CategorySubscription> CategorySubscriptions { get; set; } = new List<CategorySubscription>();
 }
 
 public enum CategoryType

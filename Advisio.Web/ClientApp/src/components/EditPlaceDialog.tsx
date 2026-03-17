@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import type { Place } from "./PlaceCard";
+import ImageSearchButton from "./ImageSearchButton";
 
 interface EditPlaceDialogProps {
   place: Place | null;
@@ -67,8 +68,11 @@ const EditPlaceDialog = ({
       setLatitude(place.latitude?.toString() || "");
       setLongitude(place.longitude?.toString() || "");
       setType(place.type || "");
-      // Получаем ID категорий по именам
-      const categoryIds = place.categories
+      // Нормализуем categories: могут быть строки или объекты {id, name}
+      const catNames = (place.categories || []).map((c) =>
+        typeof c === "string" ? c : (c as { name?: string })?.name
+      ).filter(Boolean) as string[];
+      const categoryIds = catNames
         .map((catName) => categories.find((c) => c.name === catName)?.id)
         .filter((id): id is number => id !== undefined);
       setSelectedCategories(categoryIds);
@@ -124,6 +128,20 @@ const EditPlaceDialog = ({
     );
   };
 
+  // Не рендерим содержимое если place не загружен (избегаем падения)
+  if (open && !place) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Редактировать место</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground py-8 text-center">Загрузка...</p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -156,12 +174,12 @@ const EditPlaceDialog = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="type">Тип</Label>
-              <Select value={type} onValueChange={setType}>
+              <Select value={type || "__none__"} onValueChange={(v) => setType(v === "__none__" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Выберите тип" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Не указан</SelectItem>
+                  <SelectItem value="__none__">Не указан</SelectItem>
                   {PLACE_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
                       {t}
@@ -210,12 +228,15 @@ const EditPlaceDialog = ({
 
           <div className="space-y-2">
             <Label htmlFor="imageUrl">URL изображения</Label>
-            <Input
-              id="imageUrl"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://example.com/image.jpg"
-            />
+            <div className="flex gap-2">
+              <Input
+                id="imageUrl"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+              />
+              <ImageSearchButton onSelect={(url) => setImageUrl(url)} placeName={name} />
+            </div>
           </div>
 
           <div className="space-y-2">

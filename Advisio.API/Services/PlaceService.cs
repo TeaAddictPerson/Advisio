@@ -24,6 +24,10 @@ public class PlaceService : IPlaceService
                 .Include(p => p.Likes)
                 .AsQueryable();
 
+            // Скрываем места с истёкшим временем проведения (мероприятия)
+            var today = DateTime.UtcNow.Date;
+            query = query.Where(p => p.EventEndDate == null || p.EventEndDate >= today);
+
             // Поиск по названию или описанию
             if (!string.IsNullOrWhiteSpace(searchQuery))
             {
@@ -110,13 +114,17 @@ public class PlaceService : IPlaceService
         }
     }
 
-    public async Task<PlaceDto?> GetPlaceByIdAsync(int id, int? userId = null)
+    public async Task<PlaceDto?> GetPlaceByIdAsync(int id, int? userId = null, bool includeExpiredEvents = false)
     {
-        var place = await _context.Places
+        var today = DateTime.UtcNow.Date;
+        var query = _context.Places
             .Include(p => p.PlaceCategories)
                 .ThenInclude(pc => pc.Category)
             .Include(p => p.Likes)
-            .FirstOrDefaultAsync(p => p.Id == id);
+            .Where(p => p.Id == id);
+        if (!includeExpiredEvents)
+            query = query.Where(p => p.EventEndDate == null || p.EventEndDate >= today);
+        var place = await query.FirstOrDefaultAsync();
 
         if (place == null) return null;
 
@@ -136,7 +144,32 @@ public class PlaceService : IPlaceService
                 .ToListAsync()).ToHashSet();
         }
 
-        return MapToDto(place, userId, favoritePlaceIds, likedPlaceIds);
+        var placeDto = MapToDto(place, userId, favoritePlaceIds, likedPlaceIds);
+
+        // Добавляем рейтинг и подписку (в try-catch на случай если миграция не применена)
+        try
+        {
+            var reviews = await _context.PlaceReviews.Where(r => r.PlaceId == id).ToListAsync();
+            placeDto.ReviewsCount = reviews.Count;
+            placeDto.AverageRating = reviews.Any() ? reviews.Average(r => r.Rating) : null;
+            if (userId.HasValue)
+            {
+                placeDto.IsSubscribed = await _context.PlaceSubscriptions
+                    .AnyAsync(s => s.UserId == userId.Value && s.PlaceId == id);
+                try
+                {
+                    placeDto.IsVisited = await _context.PlaceVisits
+                        .AnyAsync(v => v.UserId == userId.Value && v.PlaceId == id);
+                }
+                catch { /* PlaceVisits может отсутствовать */ }
+            }
+        }
+        catch (Microsoft.Data.SqlClient.SqlException)
+        {
+            // Таблицы PlaceReviews/PlaceSubscriptions могут отсутствовать до применения миграции
+        }
+
+        return placeDto;
     }
 
     public async Task<PlaceDto> CreatePlaceAsync(CreatePlaceDto createPlaceDto)
@@ -207,6 +240,8 @@ public class PlaceService : IPlaceService
         place.Latitude = updatePlaceDto.Latitude;
         place.Longitude = updatePlaceDto.Longitude;
         place.Type = updatePlaceDto.Type;
+        place.EventStartDate = updatePlaceDto.EventStartDate;
+        place.EventEndDate = updatePlaceDto.EventEndDate;
         place.UpdatedAt = DateTime.UtcNow;
 
         // Обновляем категории
@@ -358,6 +393,239 @@ public class PlaceService : IPlaceService
         var likedPlaceIds = likes.Select(p => p.Id).ToHashSet();
 
         return likes.Select(p => MapToDto(p, userId, favoritePlaceIds, likedPlaceIds)).ToList();
+    }
+
+    public async Task RecordPlaceViewAsync(int userId, int placeId)
+    {
+        try
+        {
+            if (!await _context.Places.AnyAsync(p => p.Id == placeId)) return;
+            if (!await _context.Users.AnyAsync(u => u.Id == userId)) return;
+            _context.PlaceViews.Add(new PlaceView { UserId = userId, PlaceId = placeId, ViewedAt = DateTime.UtcNow });
+            await _context.SaveChangesAsync();
+        }
+        catch { /* PlaceViews может отсутствовать */ }
+    }
+
+    public async Task RecordFilterUsageAsync(int userId, string filterType, string filterValue)
+    {
+        try
+        {
+            if (!await _context.Users.AnyAsync(u => u.Id == userId)) return;
+            if (string.IsNullOrWhiteSpace(filterType) || string.IsNullOrWhiteSpace(filterValue)) return;
+            _context.UserFilterUsages.Add(new UserFilterUsage { UserId = userId, FilterType = filterType, FilterValue = filterValue, UsedAt = DateTime.UtcNow });
+            await _context.SaveChangesAsync();
+        }
+        catch { /* UserFilterUsages может отсутствовать */ }
+    }
+
+    public async Task<List<PlaceReviewDto>> GetPlaceReviewsAsync(int placeId)
+    {
+        var reviews = await _context.PlaceReviews
+            .Where(r => r.PlaceId == placeId)
+            .Include(r => r.User)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+
+        return reviews.Select(r => new PlaceReviewDto
+        {
+            Id = r.Id,
+            UserId = r.UserId,
+            Username = r.User?.Username ?? "",
+            PlaceId = r.PlaceId,
+            Rating = r.Rating,
+            Comment = r.Comment,
+            CreatedAt = r.CreatedAt
+        }).ToList();
+    }
+
+    public async Task<PlaceReviewDto?> AddOrUpdateReviewAsync(int userId, int placeId, int rating, string? comment)
+    {
+        if (rating < 1 || rating > 5) return null;
+        if (!await _context.Places.AnyAsync(p => p.Id == placeId)) return null;
+        if (!await _context.Users.AnyAsync(u => u.Id == userId)) return null;
+
+        var existing = await _context.PlaceReviews
+            .Include(r => r.User)
+            .FirstOrDefaultAsync(r => r.UserId == userId && r.PlaceId == placeId);
+
+        // Один рейтинг на место — не разрешаем добавлять второй или менять существующий
+        if (existing != null)
+        {
+            return new PlaceReviewDto
+            {
+                Id = existing.Id,
+                UserId = existing.UserId,
+                Username = existing.User?.Username ?? "",
+                PlaceId = existing.PlaceId,
+                Rating = existing.Rating,
+                Comment = existing.Comment,
+                CreatedAt = existing.CreatedAt
+            };
+        }
+
+        _context.PlaceReviews.Add(new PlaceReview
+        {
+            UserId = userId,
+            PlaceId = placeId,
+            Rating = rating,
+            Comment = comment?.Trim(),
+            CreatedAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var updated = await _context.PlaceReviews
+            .Include(r => r.User)
+            .FirstOrDefaultAsync(r => r.UserId == userId && r.PlaceId == placeId);
+        return updated == null ? null : new PlaceReviewDto
+        {
+            Id = updated.Id,
+            UserId = updated.UserId,
+            Username = updated.User?.Username ?? "",
+            PlaceId = updated.PlaceId,
+            Rating = updated.Rating,
+            Comment = updated.Comment,
+            CreatedAt = updated.CreatedAt
+        };
+    }
+
+    public async Task<List<PlaceCommentDto>> GetPlaceCommentsAsync(int placeId)
+    {
+        var comments = await _context.PlaceComments
+            .Where(c => c.PlaceId == placeId)
+            .Include(c => c.User)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
+
+        return comments.Select(c => new PlaceCommentDto
+        {
+            Id = c.Id,
+            UserId = c.UserId,
+            Username = c.User?.Username ?? "",
+            PlaceId = c.PlaceId,
+            Comment = c.Comment,
+            CreatedAt = c.CreatedAt
+        }).ToList();
+    }
+
+    public async Task<PlaceCommentDto?> AddPlaceCommentAsync(int userId, int placeId, string comment)
+    {
+        if (string.IsNullOrWhiteSpace(comment)) return null;
+        if (!await _context.Places.AnyAsync(p => p.Id == placeId)) return null;
+        if (!await _context.Users.AnyAsync(u => u.Id == userId)) return null;
+
+        var entity = new PlaceComment
+        {
+            UserId = userId,
+            PlaceId = placeId,
+            Comment = comment.Trim(),
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.PlaceComments.Add(entity);
+        await _context.SaveChangesAsync();
+
+        var updated = await _context.PlaceComments
+            .Include(c => c.User)
+            .FirstOrDefaultAsync(c => c.Id == entity.Id);
+        return updated == null ? null : new PlaceCommentDto
+        {
+            Id = updated.Id,
+            UserId = updated.UserId,
+            Username = updated.User?.Username ?? "",
+            PlaceId = updated.PlaceId,
+            Comment = updated.Comment,
+            CreatedAt = updated.CreatedAt
+        };
+    }
+
+    public async Task<bool> SubscribeToPlaceAsync(int userId, int placeId)
+    {
+        if (!await _context.Places.AnyAsync(p => p.Id == placeId)) return false;
+        if (!await _context.Users.AnyAsync(u => u.Id == userId)) return false;
+        if (await _context.PlaceSubscriptions.AnyAsync(s => s.UserId == userId && s.PlaceId == placeId)) return false;
+
+        _context.PlaceSubscriptions.Add(new PlaceSubscription
+        {
+            UserId = userId,
+            PlaceId = placeId,
+            SubscribedAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> UnsubscribeFromPlaceAsync(int userId, int placeId)
+    {
+        var sub = await _context.PlaceSubscriptions
+            .FirstOrDefaultAsync(s => s.UserId == userId && s.PlaceId == placeId);
+        if (sub == null) return false;
+
+        _context.PlaceSubscriptions.Remove(sub);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> MarkPlaceVisitedAsync(int userId, int placeId)
+    {
+        if (!await _context.Places.AnyAsync(p => p.Id == placeId)) return false;
+        if (!await _context.Users.AnyAsync(u => u.Id == userId)) return false;
+
+        try
+        {
+            var existing = await _context.PlaceVisits
+                .FirstOrDefaultAsync(v => v.UserId == userId && v.PlaceId == placeId);
+            if (existing != null)
+            {
+                existing.VisitedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                _context.PlaceVisits.Add(new PlaceVisit
+                {
+                    UserId = userId,
+                    PlaceId = placeId,
+                    VisitedAt = DateTime.UtcNow
+                });
+            }
+            await _context.SaveChangesAsync();
+            return true;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> UnmarkPlaceVisitedAsync(int userId, int placeId)
+    {
+        try
+        {
+            var visit = await _context.PlaceVisits
+                .FirstOrDefaultAsync(v => v.UserId == userId && v.PlaceId == placeId);
+            if (visit == null) return false;
+            _context.PlaceVisits.Remove(visit);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+        catch { return false; }
+    }
+
+    public async Task<List<PlaceDto>> GetUserVisitedPlacesAsync(int userId)
+    {
+        try
+        {
+            var visitIds = await _context.PlaceVisits
+                .Where(v => v.UserId == userId)
+                .OrderByDescending(v => v.VisitedAt)
+                .Select(v => v.PlaceId)
+                .ToListAsync();
+
+            var result = new List<PlaceDto>();
+            foreach (var pid in visitIds)
+            {
+                var p = await GetPlaceByIdAsync(pid, userId);
+                if (p != null) result.Add(p);
+            }
+            return result;
+        }
+        catch { return new List<PlaceDto>(); }
     }
 
     public async Task AssignCategoriesToPlacesWithoutCategoriesAsync()

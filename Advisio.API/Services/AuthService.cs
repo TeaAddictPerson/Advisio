@@ -58,17 +58,44 @@ public class AuthService : IAuthService
                 Id = user.Id,
                 Username = user.Username,
                 Email = user.Email,
-                Role = user.Role
+                Role = user.Role,
+                CreatedAt = user.CreatedAt
             }
         };
     }
 
     public async Task<AuthResultDto> LoginAsync(string email, string password)
     {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Email == email);
+        var emailNorm = (email ?? "").Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(emailNorm) || string.IsNullOrEmpty(password))
+        {
+            return new AuthResultDto
+            {
+                Success = false,
+                Message = "Неверный email или пароль"
+            };
+        }
 
-        if (user == null || !VerifyPassword(password, user.PasswordHash))
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == emailNorm);
+
+        if (user == null)
+        {
+            return new AuthResultDto
+            {
+                Success = false,
+                Message = "Неверный email или пароль"
+            };
+        }
+
+        if (string.IsNullOrEmpty(user.PasswordHash))
+        {
+            // Учётные записи до миграции PasswordHash: устанавливаем введённый пароль при первом входе
+            user.PasswordHash = HashPassword(password);
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+        else if (!VerifyPassword(password, user.PasswordHash))
         {
             return new AuthResultDto
             {
@@ -78,7 +105,7 @@ public class AuthService : IAuthService
         }
 
         // Ensure admin@gmail.com always has Admin role
-        if (email.ToLower() == "admin@gmail.com" && user.Role != UserRole.Admin)
+        if (emailNorm == "admin@gmail.com" && user.Role != UserRole.Admin)
         {
             user.Role = UserRole.Admin;
             await _context.SaveChangesAsync();
@@ -100,7 +127,9 @@ public class AuthService : IAuthService
 
     public async Task<bool> UserExistsByEmailAsync(string email)
     {
-        return await _context.Users.AnyAsync(u => u.Email == email);
+        var emailNorm = (email ?? "").Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(emailNorm)) return false;
+        return await _context.Users.AnyAsync(u => u.Email != null && u.Email.ToLower() == emailNorm);
     }
 
     public async Task<bool> UserExistsByUsernameAsync(string username)
@@ -187,6 +216,7 @@ public class AuthService : IAuthService
         return passwordHash == hash;
     }
 }
+
 
 
 

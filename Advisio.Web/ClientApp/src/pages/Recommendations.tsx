@@ -49,10 +49,23 @@ const Recommendations = () => {
             categories: r.place?.categories || r.categories || [],
             isLiked: r.place?.isLiked || r.isLiked || false,
             isFavorite: r.place?.isFavorite || r.isFavorite || false,
+            averageRating: r.place?.averageRating != null ? Number(r.place.averageRating) : undefined,
+            reviewsCount: r.place?.reviewsCount ?? 0,
           },
           score: r.score || 0,
           reason: r.reason || null,
         }));
+        // Сначала места с оценкой, затем без, внутри групп — по убыванию рейтинга/score
+        recommendationsData.sort((a, b) => {
+          const aHasRating = a.place.averageRating != null && a.place.averageRating > 0;
+          const bHasRating = b.place.averageRating != null && b.place.averageRating > 0;
+          if (aHasRating && !bHasRating) return -1;
+          if (!aHasRating && bHasRating) return 1;
+          const aVal = a.place.averageRating ?? 0;
+          const bVal = b.place.averageRating ?? 0;
+          if (bVal !== aVal) return bVal - aVal;
+          return (b.score || 0) - (a.score || 0);
+        });
         setRecommendations(recommendationsData);
       } else {
         toast.error("Не удалось загрузить рекомендации");
@@ -194,13 +207,20 @@ const Recommendations = () => {
                   animationFillMode: "forwards",
                 }}
               >
-                {/* Score Header */}
+                {/* Average Rating Header */}
                 <CardHeader className="bg-success text-success-foreground py-3 px-6">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold">
-                      Оценка: {rec.score.toFixed(1)}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold flex items-center gap-1">
+                      {rec.place.averageRating != null && rec.place.averageRating > 0 ? (
+                        <>
+                          <Star className="h-4 w-4 fill-current" />
+                          {rec.place.averageRating.toFixed(1)} ({rec.place.reviewsCount || 0})
+                        </>
+                      ) : (
+                        "Без оценок"
+                      )}
                     </span>
-                    <Sparkles className="h-5 w-5" />
+                    <Sparkles className="h-5 w-5 shrink-0" />
                   </div>
                 </CardHeader>
 

@@ -14,6 +14,10 @@ public class PlaceDto
     public bool IsFavorite { get; set; }
     public bool IsLiked { get; set; }
     public int LikesCount { get; set; }
+    public double? AverageRating { get; set; }
+    public int ReviewsCount { get; set; }
+    public bool IsSubscribed { get; set; }
+    public bool IsVisited { get; set; }
 }
 
 public class CreatePlaceDto
@@ -38,4 +42,6 @@ public class UpdatePlaceDto
     public decimal? Longitude { get; set; }
     public string? Type { get; set; }
     public List<int> CategoryIds { get; set; } = new();
+    public DateTime? EventStartDate { get; set; }
+    public DateTime? EventEndDate { get; set; }
 }
