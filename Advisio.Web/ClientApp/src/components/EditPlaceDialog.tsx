@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { Upload } from "lucide-react";
 import type { Place } from "./PlaceCard";
 import ImageSearchButton from "./ImageSearchButton";
 
@@ -27,6 +28,7 @@ interface EditPlaceDialogProps {
   onOpenChange: (open: boolean) => void;
   onSave: () => void;
   categories: Array<{ id: number; name: string }>;
+  isAdmin?: boolean;
 }
 
 const PLACE_TYPES = [
@@ -48,7 +50,9 @@ const EditPlaceDialog = ({
   onOpenChange,
   onSave,
   categories,
+  isAdmin = false,
 }: EditPlaceDialogProps) => {
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
@@ -58,6 +62,7 @@ const EditPlaceDialog = ({
   const [type, setType] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     if (place) {
@@ -126,6 +131,42 @@ const EditPlaceDialog = ({
         ? prev.filter((id) => id !== categoryId)
         : [...prev, categoryId]
     );
+  };
+
+  const triggerImageUpload = () => imageFileInputRef.current?.click();
+
+  const handleImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Выберите изображение (jpg, png, gif, webp)…");
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/Images/upload", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          setImageUrl(data.url);
+          toast.success("Изображение загружено");
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err?.error || "Не удалось загрузить файл");
+      }
+    } catch {
+      toast.error("Ошибка при загрузке");
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   // Не рендерим содержимое если place не загружен (избегаем падения)
@@ -227,15 +268,40 @@ const EditPlaceDialog = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="imageUrl">URL изображения</Label>
-            <div className="flex gap-2">
+            <Label htmlFor="imageUrl">Изображение места</Label>
+            <input
+              ref={imageFileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              className="hidden"
+              onChange={handleImageFile}
+            />
+            <div className="flex flex-wrap gap-2 items-center">
               <Input
                 id="imageUrl"
+                className="flex-1 min-w-[12rem]"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://example.com/image.jpg"
+                placeholder="URL или загрузите файл (админ)"
               />
-              <ImageSearchButton onSelect={(url) => setImageUrl(url)} placeName={name} />
+              <ImageSearchButton
+                onSelect={(url) => setImageUrl(url)}
+                placeName={name}
+                placeType={type}
+                placeAddress={address}
+              />
+              {isAdmin && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  title="Загрузить с компьютера"
+                  disabled={uploadingImage}
+                  onClick={triggerImageUpload}
+                >
+                  <Upload className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
 

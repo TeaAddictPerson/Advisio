@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -11,19 +11,61 @@ import { Search, ImageIcon } from "lucide-react";
 interface ImageSearchButtonProps {
   onSelect: (url: string) => void;
   placeName: string;
+  placeType?: string;
+  placeAddress?: string;
 }
 
-const ImageSearchButton = ({ onSelect, placeName }: ImageSearchButtonProps) => {
-  const [query, setQuery] = useState(placeName || "");
+function composeKeywordString(name: string, type?: string, address?: string): string {
+  const parts = [name, type, address]
+    .map((s) => (s || "").trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+  const seen = new Set<string>();
+  const tokens: string[] = [];
+  for (const segment of parts) {
+    for (const raw of segment.split(/\s+/)) {
+      const w = raw.replace(/^[\p{P}\s]+|[\p{P}\s]+$/gu, "");
+      if (w.length < 2) continue;
+      const low = w.toLowerCase();
+      if (seen.has(low)) continue;
+      seen.add(low);
+      tokens.push(w);
+    }
+  }
+  return tokens.join(" ");
+}
+
+const ImageSearchButton = ({
+  onSelect,
+  placeName,
+  placeType,
+  placeAddress,
+}: ImageSearchButtonProps) => {
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<Array<{ url: string; thumbnailUrl?: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    if (open) {
+      setQuery(composeKeywordString(placeName, placeType, placeAddress));
+    }
+  }, [open, placeName, placeType, placeAddress]);
+
   const search = async () => {
-    if (!query.trim()) return;
+    const hasContext =
+      placeName.trim().length > 0 ||
+      !!placeType?.trim() ||
+      !!placeAddress?.trim();
+    if (!query.trim() && !hasContext) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/Images/search?query=${encodeURIComponent(query)}&count=6`);
+      const params = new URLSearchParams();
+      params.set("query", query.trim());
+      params.set("count", "10");
+      if (placeName.trim()) params.set("placeName", placeName.trim());
+      if (placeType?.trim()) params.set("placeType", placeType.trim());
+      if (placeAddress?.trim()) params.set("placeAddress", placeAddress.trim());
+      const res = await fetch(`/api/Images/search?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setResults(data);
@@ -38,17 +80,20 @@ const ImageSearchButton = ({ onSelect, placeName }: ImageSearchButtonProps) => {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="icon" title="Поиск изображения">
+        <Button type="button" variant="outline" size="icon" title="Поиск в Wikimedia Commons">
           <ImageIcon className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-4" align="end">
-        <p className="text-sm font-medium mb-2">Поиск изображения</p>
+      <PopoverContent className="w-96 p-4" align="end">
+        <p className="text-sm font-medium mb-1">Поиск изображения</p>
+        <p className="text-xs text-muted-foreground mb-3">
+          Подбор фото: стоки (если заданы ключи в настройках сервера), затем Wikimedia Commons; при отсутствии результатов — тестовые картинки (picsum).
+        </p>
         <div className="flex gap-2 mb-3">
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Название места..."
+            placeholder="Ключевые слова..."
             onKeyDown={(e) => e.key === "Enter" && search()}
           />
           <Button type="button" size="icon" onClick={search} disabled={loading}>
@@ -56,7 +101,7 @@ const ImageSearchButton = ({ onSelect, placeName }: ImageSearchButtonProps) => {
           </Button>
         </div>
         {loading && <p className="text-sm text-muted-foreground">Поиск...</p>}
-        <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+        <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
           {results.map((img, i) => (
             <button
               key={i}

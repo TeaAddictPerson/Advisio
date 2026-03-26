@@ -388,6 +388,7 @@ const Places = () => {
           onOpenChange={setEditDialogOpen}
           onSave={handlePlaceUpdated}
           categories={categories}
+          isAdmin={isAdmin(user?.role)}
         />
       </div>
     </Layout>

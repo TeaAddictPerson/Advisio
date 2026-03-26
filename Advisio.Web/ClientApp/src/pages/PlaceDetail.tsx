@@ -703,6 +703,7 @@ const PlaceDetail = () => {
           onOpenChange={setEditDialogOpen}
           onSave={handlePlaceUpdated}
           categories={categories}
+          isAdmin={isAdmin(user?.role)}
         />
       </div>
     </Layout>
