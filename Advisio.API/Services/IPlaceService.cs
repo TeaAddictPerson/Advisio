@@ -16,6 +16,8 @@ public interface IPlaceService
     Task<List<PlaceDto>> GetFavoritePlacesAsync(int userId);
     Task<List<PlaceDto>> GetLikedPlacesAsync(int userId);
     Task AssignCategoriesToPlacesWithoutCategoriesAsync();
+    /// <summary>Автоподбор ImageUrl для мест без картинки (лимит за вызов).</summary>
+    Task<int> AssignImagesToPlacesWithoutImagesAsync(int maxPlaces, CancellationToken cancellationToken = default);
     Task RecordPlaceViewAsync(int userId, int placeId);
     Task RecordFilterUsageAsync(int userId, string filterType, string filterValue);
     Task<List<PlaceReviewDto>> GetPlaceReviewsAsync(int placeId);

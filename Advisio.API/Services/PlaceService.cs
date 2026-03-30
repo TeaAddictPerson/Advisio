@@ -8,10 +8,12 @@ namespace Advisio.API.Services;
 public class PlaceService : IPlaceService
 {
     private readonly AdvisioDbContext _context;
+    private readonly IPlaceImageSearchService _placeImageSearch;
 
-    public PlaceService(AdvisioDbContext context)
+    public PlaceService(AdvisioDbContext context, IPlaceImageSearchService placeImageSearch)
     {
         _context = context;
+        _placeImageSearch = placeImageSearch;
     }
 
     public async Task<PagedResult<PlaceDto>> GetAllPlacesAsync(int? userId = null, string? searchQuery = null, int? categoryId = null, string? type = null, string? sortBy = null, int page = 1, int pageSize = 30)
@@ -189,14 +191,29 @@ public class PlaceService : IPlaceService
             throw new InvalidOperationException($"Место с названием '{createPlaceDto.Name}' уже существует");
         }
 
+        var imageUrl = createPlaceDto.ImageUrl?.Trim();
+        if (string.IsNullOrWhiteSpace(imageUrl))
+        {
+            try
+            {
+                imageUrl = await _placeImageSearch.PickFirstImageUrlAsync(
+                    createPlaceDto.Name.Trim(), createPlaceDto.Type, createPlaceDto.Address);
+            }
+            catch
+            {
+                imageUrl = null;
+            }
+        }
+
         var place = new Place
         {
             Name = createPlaceDto.Name.Trim(),
             Description = createPlaceDto.Description ?? string.Empty,
             Address = createPlaceDto.Address,
-            ImageUrl = createPlaceDto.ImageUrl,
+            ImageUrl = imageUrl,
             Latitude = createPlaceDto.Latitude,
             Longitude = createPlaceDto.Longitude,
+            Type = createPlaceDto.Type,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -236,10 +253,22 @@ public class PlaceService : IPlaceService
         place.Name = updatePlaceDto.Name.Trim();
         place.Description = updatePlaceDto.Description ?? string.Empty;
         place.Address = updatePlaceDto.Address;
-        place.ImageUrl = updatePlaceDto.ImageUrl;
+        place.ImageUrl = updatePlaceDto.ImageUrl?.Trim();
         place.Latitude = updatePlaceDto.Latitude;
         place.Longitude = updatePlaceDto.Longitude;
         place.Type = updatePlaceDto.Type;
+        if (string.IsNullOrWhiteSpace(place.ImageUrl))
+        {
+            try
+            {
+                place.ImageUrl = await _placeImageSearch.PickFirstImageUrlAsync(
+                    place.Name, place.Type, place.Address);
+            }
+            catch
+            {
+                place.ImageUrl = null;
+            }
+        }
         place.EventStartDate = updatePlaceDto.EventStartDate;
         place.EventEndDate = updatePlaceDto.EventEndDate;
         place.UpdatedAt = DateTime.UtcNow;
@@ -754,6 +783,45 @@ public class PlaceService : IPlaceService
         {
             throw new Exception($"Ошибка при присвоении категорий местам: {ex.Message}", ex);
         }
+    }
+
+    public async Task<int> AssignImagesToPlacesWithoutImagesAsync(int maxPlaces, CancellationToken cancellationToken = default)
+    {
+        if (maxPlaces <= 0)
+            return 0;
+
+        var places = await _context.Places
+            .Where(p => string.IsNullOrWhiteSpace(p.ImageUrl))
+            .OrderBy(p => p.Id)
+            .Take(maxPlaces)
+            .ToListAsync(cancellationToken);
+
+        var updated = 0;
+        foreach (var place in places)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string? url;
+            try
+            {
+                url = await _placeImageSearch.PickFirstImageUrlAsync(place.Name, place.Type, place.Address, cancellationToken);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(url))
+                continue;
+
+            place.ImageUrl = url;
+            place.UpdatedAt = DateTime.UtcNow;
+            updated++;
+        }
+
+        if (updated > 0)
+            await _context.SaveChangesAsync(cancellationToken);
+
+        return updated;
     }
 
     private PlaceDto MapToDto(Place place, int? userId, HashSet<int>? favoritePlaceIds = null, HashSet<int>? likedPlaceIds = null)

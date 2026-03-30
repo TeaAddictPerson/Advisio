@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Advisio.API.Services;
 using Advisio.API.Data;
@@ -32,6 +33,49 @@ public class AdminController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { error = $"Ошибка при присвоении категорий: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Автоподбор URL картинок для мест с пустым ImageUrl. Идёт пакетами, пока есть места без фото.
+    /// </summary>
+    /// <param name="maxPerBatch">Размер пакета за один вызов к БД (по умолчанию из PlacesSync:MaxPlacesImageBackfillPerRun или 50).</param>
+    /// <param name="maxTotal">Остановка после стольких успешно обновлённых мест (0 = без лимита).</param>
+    [HttpPost("backfill-place-images")]
+    public async Task<ActionResult> BackfillPlaceImages(
+        [FromQuery] int? maxPerBatch = null,
+        [FromQuery] int maxTotal = 0)
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var cfg = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+            var batch = maxPerBatch is > 0
+                ? maxPerBatch.Value
+                : cfg.GetValue<int>("PlacesSync:MaxPlacesImageBackfillPerRun", 50);
+            var placeService = scope.ServiceProvider.GetRequiredService<IPlaceService>();
+
+            var totalUpdated = 0;
+            while (maxTotal == 0 || totalUpdated < maxTotal)
+            {
+                var take = maxTotal > 0 ? Math.Min(batch, maxTotal - totalUpdated) : batch;
+                if (take <= 0)
+                    break;
+                var n = await placeService.AssignImagesToPlacesWithoutImagesAsync(take);
+                if (n == 0)
+                    break;
+                totalUpdated += n;
+            }
+
+            return Ok(new
+            {
+                message = $"Обновлено мест с картинками: {totalUpdated}",
+                updated = totalUpdated
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = $"Ошибка автоподбора картинок: {ex.Message}" });
         }
     }
 

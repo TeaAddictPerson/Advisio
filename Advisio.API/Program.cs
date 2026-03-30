@@ -14,6 +14,7 @@ builder.Services.AddDbContext<AdvisioDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Services
+builder.Services.AddScoped<IPlaceImageSearchService, PlaceImageSearchService>();
 builder.Services.AddScoped<IPlaceService, PlaceService>();
 builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 builder.Services.AddScoped<ISurveyService, SurveyService>();

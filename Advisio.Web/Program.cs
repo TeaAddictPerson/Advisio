@@ -32,6 +32,7 @@ builder.Services.AddDbContext<AdvisioDbContext>(options =>
              .EnableRetryOnFailure()));
 
 // Services
+builder.Services.AddScoped<IPlaceImageSearchService, PlaceImageSearchService>();
 builder.Services.AddScoped<IPlaceService, PlaceService>();
 builder.Services.AddScoped<ICollectionService, CollectionService>();
 builder.Services.AddScoped<IRecommendationService, RecommendationService>();
@@ -109,4 +110,25 @@ if (Directory.Exists(Path.Combine(builder.Environment.ContentRootPath, "wwwroot"
     });
 }
 
-app.Run();
+if (args.Any(a => string.Equals(a, "--backfill-place-images", StringComparison.OrdinalIgnoreCase)))
+{
+    var batch = app.Configuration.GetValue<int>("PlacesSync:MaxPlacesImageBackfillPerRun", 50);
+    using var scope = app.Services.CreateScope();
+    var placeService = scope.ServiceProvider.GetRequiredService<IPlaceService>();
+    var total = 0;
+    Console.WriteLine($"Автоподбор картинок для мест без фото (пакет по {batch})…");
+    while (true)
+    {
+        var n = await placeService.AssignImagesToPlacesWithoutImagesAsync(batch);
+        total += n;
+        Console.WriteLine($"  пакет: +{n}, всего обновлено: {total}");
+        if (n == 0)
+            break;
+    }
+
+    Console.WriteLine($"Готово. Всего обновлено мест: {total}");
+    await app.DisposeAsync();
+    return;
+}
+
+await app.RunAsync();

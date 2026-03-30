@@ -71,19 +71,32 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
     public async Task SyncPlacesAsync()
     {
         using var scope = _serviceProvider.CreateScope();
-        
+        var placeService = scope.ServiceProvider.GetRequiredService<IPlaceService>();
+
         try
         {
-            // Присваиваем категории местам без категорий
             _logger.LogInformation("Присвоение категорий местам без категорий...");
-            var placeService = scope.ServiceProvider.GetRequiredService<IPlaceService>();
             await placeService.AssignCategoriesToPlacesWithoutCategoriesAsync();
             _logger.LogInformation("Категории присвоены успешно");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Ошибка при присвоении категорий");
-            // Продолжаем выполнение даже если присвоение категорий не удалось
+        }
+
+        try
+        {
+            var maxImageBackfill = _configuration.GetValue<int>("PlacesSync:MaxPlacesImageBackfillPerRun", 50);
+            if (maxImageBackfill > 0)
+            {
+                _logger.LogInformation("Автоподбор изображений для мест без картинки (до {Max})...", maxImageBackfill);
+                var imageCount = await placeService.AssignImagesToPlacesWithoutImagesAsync(maxImageBackfill);
+                _logger.LogInformation("Обновлено изображений у мест: {Count}", imageCount);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при автоподборе изображений для мест");
         }
     }
 }
