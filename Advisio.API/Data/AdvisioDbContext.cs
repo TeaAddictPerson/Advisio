@@ -70,6 +70,13 @@ public class AdvisioDbContext : DbContext
             .HasForeignKey(usr => usr.QuestionId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        modelBuilder.Entity<Place>()
+            .Property(p => p.Latitude)
+            .HasPrecision(9, 6);
+        modelBuilder.Entity<Place>()
+            .Property(p => p.Longitude)
+            .HasPrecision(10, 7);
+
         // Индексы для оптимизации запросов
         modelBuilder.Entity<Place>()
             .HasIndex(p => p.Name);
@@ -82,6 +89,9 @@ public class AdvisioDbContext : DbContext
             .HasIndex(u => u.Username)
             .IsUnique();
 
+        modelBuilder.Entity<Recommendation>()
+            .Property(r => r.Score)
+            .HasPrecision(18, 2);
         modelBuilder.Entity<Recommendation>()
             .HasIndex(r => new { r.UserId, r.PlaceId })
             .IsUnique();

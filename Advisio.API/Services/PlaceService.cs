@@ -48,11 +48,11 @@ public class PlaceService : IPlaceService
                                          p.PlaceCategories.Any(pc => pc.CategoryId == categoryId.Value));
             }
 
-            // Фильтрация по типу
+            // Фильтрация по типу (русский из UI + старые англ. слаги в БД)
             if (!string.IsNullOrWhiteSpace(type))
             {
-                var typeLower = type.ToLower();
-                query = query.Where(p => p.Type != null && p.Type.ToLower() == typeLower);
+                var matchLowered = PlaceTypeFormatter.LowercasedValuesMatchingTypeFilter(type);
+                query = query.Where(p => p.Type != null && matchLowered.Contains(p.Type.ToLower()));
             }
 
             // Сортировка
@@ -196,8 +196,9 @@ public class PlaceService : IPlaceService
         {
             try
             {
+                var typeForSearch = PlaceTypeFormatter.FormatForDisplay(createPlaceDto.Type);
                 imageUrl = await _placeImageSearch.PickFirstImageUrlAsync(
-                    createPlaceDto.Name.Trim(), createPlaceDto.Type, createPlaceDto.Address);
+                    createPlaceDto.Name.Trim(), typeForSearch, createPlaceDto.Address);
             }
             catch
             {
@@ -213,7 +214,9 @@ public class PlaceService : IPlaceService
             ImageUrl = imageUrl,
             Latitude = createPlaceDto.Latitude,
             Longitude = createPlaceDto.Longitude,
-            Type = createPlaceDto.Type,
+            Type = PlaceTypeFormatter.FormatForDisplay(createPlaceDto.Type),
+            EventStartDate = createPlaceDto.EventStartDate,
+            EventEndDate = createPlaceDto.EventEndDate,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -256,7 +259,7 @@ public class PlaceService : IPlaceService
         place.ImageUrl = updatePlaceDto.ImageUrl?.Trim();
         place.Latitude = updatePlaceDto.Latitude;
         place.Longitude = updatePlaceDto.Longitude;
-        place.Type = updatePlaceDto.Type;
+        place.Type = PlaceTypeFormatter.FormatForDisplay(updatePlaceDto.Type);
         if (string.IsNullOrWhiteSpace(place.ImageUrl))
         {
             try
@@ -848,13 +851,13 @@ public class PlaceService : IPlaceService
         return new PlaceDto
         {
             Id = place.Id,
-            Name = place.Name ?? string.Empty,
+            Name = PlaceNameSanitizer.ForDisplay(place.Name),
             Description = place.Description ?? string.Empty,
             Address = place.Address,
             ImageUrl = place.ImageUrl,
             Latitude = place.Latitude,
             Longitude = place.Longitude,
-            Type = place.Type,
+            Type = PlaceTypeFormatter.FormatForDisplay(place.Type),
             Categories = place.PlaceCategories?
                 .Where(pc => pc.Category != null)
                 .Select(pc => pc.Category!.Name)

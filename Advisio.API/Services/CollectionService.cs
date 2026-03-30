@@ -168,13 +168,13 @@ public class CollectionService : ICollectionService
             .Select(p => new PlaceDto
             {
                 Id = p.Id,
-                Name = p.Name ?? "",
+                Name = PlaceNameSanitizer.ForDisplay(p.Name),
                 Description = p.Description ?? "",
                 Address = p.Address,
                 ImageUrl = p.ImageUrl,
                 Latitude = p.Latitude,
                 Longitude = p.Longitude,
-                Type = p.Type,
+                Type = PlaceTypeFormatter.FormatForDisplay(p.Type),
                 Categories = p.PlaceCategories?.Select(pc => pc.Category?.Name ?? "").Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>(),
                 IsFavorite = favoriteIds.Contains(p.Id),
                 IsLiked = likedIds.Contains(p.Id),
@@ -190,13 +190,13 @@ public class CollectionService : ICollectionService
                 var placeDto = new PlaceDto
                 {
                     Id = p.Id,
-                    Name = p.Name ?? "",
+                    Name = PlaceNameSanitizer.ForDisplay(p.Name),
                     Description = p.Description ?? "",
                     Address = p.Address,
                     ImageUrl = p.ImageUrl,
                     Latitude = p.Latitude,
                     Longitude = p.Longitude,
-                    Type = p.Type,
+                    Type = PlaceTypeFormatter.FormatForDisplay(p.Type),
                     Categories = p.PlaceCategories?.Select(pc => pc.Category?.Name ?? "").Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>(),
                     IsFavorite = favoriteIds.Contains(p.Id),
                     IsLiked = likedIds.Contains(p.Id),

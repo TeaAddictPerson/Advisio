@@ -11,7 +11,8 @@ builder.Services.AddSwaggerGen();
 
 // Database
 builder.Services.AddDbContext<AdvisioDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
+        sql => sql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
 // Services
 builder.Services.AddScoped<IPlaceImageSearchService, PlaceImageSearchService>();
@@ -21,6 +22,12 @@ builder.Services.AddScoped<ISurveyService, SurveyService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IExternalPlaceService, ExternalPlaceService>();
 builder.Services.AddHttpClient<IExternalPlaceService, ExternalPlaceService>();
+
+builder.Services.AddHttpClient(PredictHqEventsImportService.HttpClientName, client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(3);
+});
+builder.Services.AddScoped<IPredictHqEventsImportService, PredictHqEventsImportService>();
 
 // Places Sync Service (Background Service)
 builder.Services.AddHostedService<PlacesSyncService>();

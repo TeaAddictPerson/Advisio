@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
     <ProjectReference Include="..\Advisio.API\Advisio.API.csproj" />
@@ -20,6 +20,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>70402b46-f0d1-4c29-82a0-de8620975ee3</UserSecretsId>
   </PropertyGroup>
 
 </Project>

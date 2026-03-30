@@ -111,13 +111,13 @@ public class UserService : IUserService
                     p = new PlaceDto
                     {
                         Id = sub.Place.Id,
-                        Name = sub.Place.Name ?? "Без названия",
+                        Name = string.IsNullOrWhiteSpace(sub.Place.Name) ? "Без названия" : PlaceNameSanitizer.ForDisplay(sub.Place.Name),
                         Description = sub.Place.Description ?? "",
                         Address = sub.Place.Address,
                         ImageUrl = sub.Place.ImageUrl,
                         Latitude = sub.Place.Latitude,
                         Longitude = sub.Place.Longitude,
-                        Type = sub.Place.Type,
+                        Type = PlaceTypeFormatter.FormatForDisplay(sub.Place.Type),
                         Categories = sub.Place.PlaceCategories?
                             .Where(pc => pc.Category != null)
                             .Select(pc => pc.Category!.Name ?? "")
@@ -210,7 +210,7 @@ public class UserService : IUserService
                 var placesCount = await _context.Places.CountAsync(p => (p.Type ?? "") == t.Type);
                 topPlaceTypes.Add(new TopPlaceTypeDto
                 {
-                    TypeName = t.Type ?? "Разное",
+                    TypeName = PlaceTypeFormatter.FormatForDisplay(t.Type ?? "Разное"),
                     ViewCount = t.Count,
                     PlacesCount = placesCount
                 });
@@ -269,7 +269,7 @@ public class UserService : IUserService
                 {
                     CollectionItemId = i.Id,
                     PlaceId = i.PlaceId,
-                    PlaceName = i.Place?.Name ?? "Место",
+                    PlaceName = string.IsNullOrWhiteSpace(i.Place?.Name) ? "Место" : PlaceNameSanitizer.ForDisplay(i.Place!.Name),
                     Note = i.Note,
                     PhotoUrls = urls
                 });

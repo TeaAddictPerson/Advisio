@@ -108,7 +108,36 @@ public class AdminController : ControllerBase
         }
     }
 
-    // Отключена загрузка из Kufar - используем только Kvitki.by
+    /// <summary>Загрузка событий из PredictHQ в таблицу мест. <paramref name="force"/> — не ждать интервал с прошлого импорта.</summary>
+    /// <param name="maxPlaces">Сколько новых мест максимум создать (по умолчанию 800; 0 = взять из PlacesSync:MaxPlacesPerSync).</param>
+    [HttpPost("import-predicthq-events")]
+    public async Task<ActionResult> ImportPredictHqEvents([FromQuery] bool force = true, [FromQuery] int maxPlaces = 800)
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var importer = scope.ServiceProvider.GetService<IPredictHqEventsImportService>();
+            if (importer == null)
+                return StatusCode(503, new { error = "Сервис PredictHQ не зарегистрирован" });
+
+            var cfg = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+            var cap = maxPlaces > 0 ? maxPlaces : cfg.GetValue<int>("PlacesSync:MaxPlacesPerSync", 800);
+
+            var added = await importer.ImportEventsAsync(forceRun: force, maxPlacesToAdd: cap);
+            return Ok(new
+            {
+                message = $"Импорт PredictHQ завершён. Добавлено новых мест: {added}",
+                added,
+                requested = cap
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = $"Ошибка импорта PredictHQ: {ex.Message}" });
+        }
+    }
+
+    // Отключена загрузка из Kufar
     // [HttpPost("load-kufar")]
     // public async Task<ActionResult> LoadKufarPlaces()
     // {

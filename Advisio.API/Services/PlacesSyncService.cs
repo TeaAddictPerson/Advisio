@@ -98,6 +98,7 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
         {
             _logger.LogError(ex, "Ошибка при автоподборе изображений для мест");
         }
+
     }
 }
 

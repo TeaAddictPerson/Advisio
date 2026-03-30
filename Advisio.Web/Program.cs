@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Advisio.API.Data;
 using Advisio.API.Services;
@@ -27,9 +28,10 @@ builder.Services.AddSession(options =>
 
 // Database
 builder.Services.AddDbContext<AdvisioDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"), 
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
         b => b.MigrationsAssembly("Advisio.Web")
-             .EnableRetryOnFailure()));
+             .EnableRetryOnFailure()
+             .UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
 // Services
 builder.Services.AddScoped<IPlaceImageSearchService, PlaceImageSearchService>();
@@ -42,12 +44,21 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IExternalPlaceService, ExternalPlaceService>();
 builder.Services.AddHttpClient<IExternalPlaceService, ExternalPlaceService>();
 
+builder.Services.AddHttpClient(PredictHqEventsImportService.HttpClientName, client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(3);
+});
+builder.Services.AddScoped<IPredictHqEventsImportService, PredictHqEventsImportService>();
+
 // Background Service для синхронизации мест
 var syncEnabled = builder.Configuration.GetValue<bool>("PlacesSync:Enabled", true);
 if (syncEnabled)
 {
     builder.Services.AddHostedService<PlacesSyncService>();
 }
+
+builder.Services.AddHostedService<PredictHqStartupImportHostedService>();
+builder.Services.AddHostedService<PredictHqPeriodicImportHostedService>();
 
 // CORS
 builder.Services.AddCors(options =>
@@ -127,6 +138,21 @@ if (args.Any(a => string.Equals(a, "--backfill-place-images", StringComparison.O
     }
 
     Console.WriteLine($"Готово. Всего обновлено мест: {total}");
+    await app.DisposeAsync();
+    return;
+}
+
+var importPhqIdx = Array.FindIndex(args, a => string.Equals(a, "--import-predicthq-events", StringComparison.OrdinalIgnoreCase));
+if (importPhqIdx >= 0)
+{
+    var cap = 800;
+    if (importPhqIdx + 1 < args.Length && int.TryParse(args[importPhqIdx + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed > 0)
+        cap = parsed;
+
+    using var scope = app.Services.CreateScope();
+    var importer = scope.ServiceProvider.GetRequiredService<IPredictHqEventsImportService>();
+    var n = await importer.ImportEventsAsync(forceRun: true, maxPlacesToAdd: cap);
+    Console.WriteLine($"PredictHQ: цель {cap}, добавлено новых мест: {n}");
     await app.DisposeAsync();
     return;
 }

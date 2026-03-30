@@ -30,6 +30,8 @@ public class CreatePlaceDto
     public decimal? Longitude { get; set; }
     public string? Type { get; set; }
     public List<int> CategoryIds { get; set; } = new();
+    public DateTime? EventStartDate { get; set; }
+    public DateTime? EventEndDate { get; set; }
 }
 
 public class UpdatePlaceDto
