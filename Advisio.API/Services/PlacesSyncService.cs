@@ -75,6 +75,20 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
 
         try
         {
+            if (_configuration.GetValue<bool>("PlacesSync:PruneLegacyPredictHqDuplicates", true))
+            {
+                var removed = await placeService.PruneLegacyPredictHqPlaceDuplicatesAsync();
+                if (removed > 0)
+                    _logger.LogInformation("Удалено дубликатов / сырых мест PredictHQ (строк Places): {Count}", removed);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при очистке дубликатов PredictHQ");
+        }
+
+        try
+        {
             _logger.LogInformation("Присвоение категорий местам без категорий...");
             await placeService.AssignCategoriesToPlacesWithoutCategoriesAsync();
             _logger.LogInformation("Категории присвоены успешно");

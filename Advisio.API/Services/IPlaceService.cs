@@ -15,6 +15,8 @@ public interface IPlaceService
     Task<bool> UnlikePlaceAsync(int userId, int placeId);
     Task<List<PlaceDto>> GetFavoritePlacesAsync(int userId);
     Task<List<PlaceDto>> GetLikedPlacesAsync(int userId);
+    Task<int> PruneLegacyPredictHqPlaceDuplicatesAsync(CancellationToken cancellationToken = default);
+
     Task AssignCategoriesToPlacesWithoutCategoriesAsync();
     /// <summary>Автоподбор ImageUrl для мест без картинки (лимит за вызов).</summary>
     Task<int> AssignImagesToPlacesWithoutImagesAsync(int maxPlaces, CancellationToken cancellationToken = default);

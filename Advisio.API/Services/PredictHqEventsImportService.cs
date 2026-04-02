@@ -32,7 +32,11 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
         _logger = logger;
     }
 
-    public async Task<int> ImportEventsAsync(bool forceRun = false, int? maxPlacesToAdd = null, CancellationToken cancellationToken = default)
+    public async Task<int> ImportEventsAsync(
+        bool forceRun = false,
+        int? maxPlacesToAdd = null,
+        CancellationToken cancellationToken = default,
+        bool exhaustivePagination = false)
     {
         if (!_configuration.GetValue<bool>("PlacesSync:ExternalImportEnabled", true))
         {
@@ -135,6 +139,7 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
                     break;
                 }
 
+                var addedBeforePage = added;
                 foreach (var el in items)
                 {
                     if (added >= maxTotal)
@@ -142,6 +147,17 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
                     cancellationToken.ThrowIfCancellationRequested();
                     if (await TryCreatePlaceFromEventAsync(el, cancellationToken))
                         added++;
+                }
+
+                var addedThisPage = added - addedBeforePage;
+                if (!exhaustivePagination
+                    && items.Count > 0
+                    && addedThisPage == 0)
+                {
+                    _logger.LogInformation(
+                        "PredictHQ: на странице offset {Offset} нет новых мест (уже в базе) — дальнейшие запросы к API не выполняем",
+                        offset);
+                    break;
                 }
 
                 offset += items.Count;
@@ -201,6 +217,8 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
         var dto = MapToCreateDto(el);
         if (dto == null || string.IsNullOrWhiteSpace(dto.Name))
             return false;
+
+        dto.Description = PredictHqDescriptionNormalizer.FinalizeImportedDescription(dto.Description ?? string.Empty);
 
         cancellationToken.ThrowIfCancellationRequested();
         try
@@ -337,7 +355,7 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
         var sb = new StringBuilder();
         var ru = CultureInfo.GetCultureInfo("ru-RU");
 
-        var clean = StripPredictHqNoise(apiDescription);
+        var clean = PredictHqDescriptionNormalizer.StripAttributionLines(apiDescription);
         if (!string.IsNullOrWhiteSpace(clean))
         {
             sb.AppendLine(clean.Trim());
@@ -354,7 +372,7 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
         AppendPhqAttendance(sb, e);
         AppendPredictedSpend(sb, e);
 
-        return sb.ToString().Trim();
+        return PredictHqDescriptionNormalizer.FinalizeImportedDescription(sb.ToString().Trim());
     }
 
     private static void AppendPhqAttendance(StringBuilder sb, JsonElement e)
@@ -386,26 +404,40 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
             sb.AppendLine($"Оценка верхней границы расходов: до {dmax:n0}");
     }
 
-    private static string StripPredictHqNoise(string? text)
+    /// <summary>
+    /// GeoJSON: Point [lon, lat]; Polygon/MultiPolygon — вложенные массивы; берём первую пару чисел.
+    /// </summary>
+    private static bool TryReadLonLatFromGeoJsonCoordinates(JsonElement coords, out decimal lon, out decimal lat)
     {
-        if (string.IsNullOrWhiteSpace(text))
-            return string.Empty;
+        lon = lat = default;
+        if (!TryFindFirstLonLatPair(coords, out var pair))
+            return false;
+        var arr = pair.EnumerateArray().ToArray();
+        return arr.Length >= 2 && arr[0].TryGetDecimal(out lon) && arr[1].TryGetDecimal(out lat);
+    }
 
-        var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
-        var kept = new List<string>();
-        foreach (var line in lines)
+    private static bool TryFindFirstLonLatPair(JsonElement el, out JsonElement pairElement)
+    {
+        pairElement = default;
+        if (el.ValueKind != JsonValueKind.Array)
+            return false;
+
+        var items = el.EnumerateArray().ToArray();
+        if (items.Length >= 2
+            && items[0].ValueKind == JsonValueKind.Number
+            && items[1].ValueKind == JsonValueKind.Number)
         {
-            var t = line.Trim();
-            if (string.IsNullOrEmpty(t))
-                continue;
-            if (t.Contains("predicthq", StringComparison.OrdinalIgnoreCase))
-                continue;
-            if (t.Contains("predict hq", StringComparison.OrdinalIgnoreCase))
-                continue;
-            kept.Add(t);
+            pairElement = el;
+            return true;
         }
 
-        return string.Join(Environment.NewLine, kept);
+        foreach (var sub in items)
+        {
+            if (TryFindFirstLonLatPair(sub, out pairElement))
+                return true;
+        }
+
+        return false;
     }
 
     private static void TryPredictHqGeo(JsonElement e, ref decimal? lat, ref decimal? lon, ref string? address)
@@ -414,14 +446,11 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
             return;
 
         if (TryGetPropertyCi(geo, "geometry", out var geom) && TryGetPropertyCi(geom, "coordinates", out var coords)
-            && coords.ValueKind == JsonValueKind.Array)
+            && coords.ValueKind == JsonValueKind.Array
+            && TryReadLonLatFromGeoJsonCoordinates(coords, out var gx, out var gy))
         {
-            var arr = coords.EnumerateArray().ToArray();
-            if (arr.Length >= 2 && arr[0].TryGetDecimal(out var x) && arr[1].TryGetDecimal(out var y))
-            {
-                lon = x;
-                lat = y;
-            }
+            lon = gx;
+            lat = gy;
         }
 
         if (string.IsNullOrWhiteSpace(address) && TryGetPropertyCi(geo, "address", out var addr) && addr.ValueKind == JsonValueKind.Object)

@@ -9,6 +9,9 @@ public static class PlaceNameSanitizer
         return StripTrailingIdSuffix(name.Trim());
     }
 
+    public static string LogicalNameKey(string? name) =>
+        ForDisplay(name ?? string.Empty).Trim().ToLowerInvariant();
+
     private static string StripTrailingIdSuffix(string t)
     {
         var idx = t.LastIndexOf('\u00B7');

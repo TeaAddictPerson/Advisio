@@ -675,6 +675,57 @@ public class PlaceService : IPlaceService
         catch { return new List<PlaceDto>(); }
     }
 
+    public async Task<int> PruneLegacyPredictHqPlaceDuplicatesAsync(CancellationToken cancellationToken = default)
+    {
+        var places = await _context.Places.ToListAsync(cancellationToken);
+        if (places.Count == 0)
+            return 0;
+
+        var toRemove = new List<Place>();
+
+        foreach (var g in places.GroupBy(p => PlaceNameSanitizer.LogicalNameKey(p.Name)))
+        {
+            var list = g.ToList();
+            if (list.Count >= 2)
+            {
+                var hasGood = list.Any(p =>
+                    !PredictHqDescriptionNormalizer.LooksLikeRawPredictHqImportDescription(p.Description));
+                if (hasGood)
+                {
+                    foreach (var p in list.Where(x =>
+                                 PredictHqDescriptionNormalizer.LooksLikeRawPredictHqImportDescription(x.Description)))
+                        toRemove.Add(p);
+                    continue;
+                }
+
+                if (list.TrueForAll(p =>
+                        PredictHqDescriptionNormalizer.LooksLikeRawPredictHqImportDescription(p.Description)))
+                {
+                    var keeper = list
+                        .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+                        .ThenByDescending(p => p.Id)
+                        .First();
+                    foreach (var p in list.Where(x => x.Id != keeper.Id))
+                        toRemove.Add(p);
+                }
+
+                continue;
+            }
+
+            var only = list[0];
+            if (PredictHqDescriptionNormalizer.LooksLikeRawPredictHqImportDescription(only.Description))
+                toRemove.Add(only);
+        }
+
+        var unique = toRemove.DistinctBy(p => p.Id).ToList();
+        if (unique.Count == 0)
+            return 0;
+
+        _context.Places.RemoveRange(unique);
+        await _context.SaveChangesAsync(cancellationToken);
+        return unique.Count;
+    }
+
     public async Task AssignCategoriesToPlacesWithoutCategoriesAsync()
     {
         try

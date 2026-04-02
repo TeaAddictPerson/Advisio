@@ -151,7 +151,7 @@ if (importPhqIdx >= 0)
 
     using var scope = app.Services.CreateScope();
     var importer = scope.ServiceProvider.GetRequiredService<IPredictHqEventsImportService>();
-    var n = await importer.ImportEventsAsync(forceRun: true, maxPlacesToAdd: cap);
+    var n = await importer.ImportEventsAsync(forceRun: true, maxPlacesToAdd: cap, exhaustivePagination: true);
     Console.WriteLine($"PredictHQ: цель {cap}, добавлено новых мест: {n}");
     await app.DisposeAsync();
     return;

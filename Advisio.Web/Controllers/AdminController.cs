@@ -123,7 +123,7 @@ public class AdminController : ControllerBase
             var cfg = scope.ServiceProvider.GetRequiredService<IConfiguration>();
             var cap = maxPlaces > 0 ? maxPlaces : cfg.GetValue<int>("PlacesSync:MaxPlacesPerSync", 800);
 
-            var added = await importer.ImportEventsAsync(forceRun: force, maxPlacesToAdd: cap);
+            var added = await importer.ImportEventsAsync(forceRun: force, maxPlacesToAdd: cap, exhaustivePagination: true);
             return Ok(new
             {
                 message = $"Импорт PredictHQ завершён. Добавлено новых мест: {added}",
