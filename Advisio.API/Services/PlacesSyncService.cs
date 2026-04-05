@@ -87,6 +87,50 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
             _logger.LogError(ex, "Ошибка при очистке дубликатов PredictHQ");
         }
 
+        var normalizeEnabled = _configuration.GetValue<bool>("PlacesSync:NormalizePlaceEventDescriptions", true);
+        var normalizationSucceeded = true;
+        try
+        {
+            if (normalizeEnabled)
+            {
+                var normalized = await placeService.NormalizeAllPlacesEventDescriptionsAndDatesAsync();
+                if (normalized > 0)
+                    _logger.LogInformation(
+                        "Нормализовано описаний и дат мероприятий (в т.ч. «Дата и время: …» → Начало/Окончание): {Count}",
+                        normalized);
+                _logger.LogInformation("Фаза нормализации мест завершена; далее — удаление просроченных по БД.");
+            }
+        }
+        catch (Exception ex)
+        {
+            normalizationSucceeded = false;
+            _logger.LogError(ex, "Ошибка при нормализации описаний и дат мероприятий");
+        }
+
+        try
+        {
+            if (_configuration.GetValue<bool>("PlacesSync:DeleteExpiredEventPlaces", true))
+            {
+                if (normalizeEnabled && !normalizationSucceeded)
+                {
+                    _logger.LogWarning(
+                        "Удаление просроченных мероприятий пропущено: сначала должна успешно завершиться нормализация всех мест.");
+                }
+                else
+                {
+                    var expiredRemoved = await placeService.DeleteExpiredEventPlacesAsync();
+                    if (expiredRemoved > 0)
+                        _logger.LogInformation(
+                            "Удалено просроченных мероприятий (по EventEndDate в БД и при необходимости по описанию, UTC): {Count}",
+                            expiredRemoved);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при удалении мероприятий с истёкшей датой");
+        }
+
         try
         {
             _logger.LogInformation("Присвоение категорий местам без категорий...");
@@ -100,8 +144,9 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
 
         try
         {
+            var imageBackfillOn = _configuration.GetValue<bool>("PlacesSync:ImageBackfillEnabled", true);
             var maxImageBackfill = _configuration.GetValue<int>("PlacesSync:MaxPlacesImageBackfillPerRun", 50);
-            if (maxImageBackfill > 0)
+            if (imageBackfillOn && maxImageBackfill > 0)
             {
                 _logger.LogInformation("Автоподбор изображений для мест без картинки (до {Max})...", maxImageBackfill);
                 var imageCount = await placeService.AssignImagesToPlacesWithoutImagesAsync(maxImageBackfill);

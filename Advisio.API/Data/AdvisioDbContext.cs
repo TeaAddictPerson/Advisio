@@ -81,6 +81,11 @@ public class AdvisioDbContext : DbContext
         modelBuilder.Entity<Place>()
             .HasIndex(p => p.Name);
 
+        modelBuilder.Entity<Place>()
+            .HasIndex(p => p.PredictHqEventId)
+            .IsUnique()
+            .HasFilter("[PredictHqEventId] IS NOT NULL");
+
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Email)
             .IsUnique();

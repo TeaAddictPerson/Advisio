@@ -32,6 +32,8 @@ public class CreatePlaceDto
     public List<int> CategoryIds { get; set; } = new();
     public DateTime? EventStartDate { get; set; }
     public DateTime? EventEndDate { get; set; }
+    /// <summary>При импорте PredictHQ — id события из API; для ручного создания не задавать.</summary>
+    public string? PredictHqEventId { get; set; }
 }
 
 public class UpdatePlaceDto

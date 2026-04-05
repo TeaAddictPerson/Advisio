@@ -31,6 +31,7 @@ builder.Services.AddScoped<IPredictHqEventsImportService, PredictHqEventsImportS
 
 // Places Sync Service (Background Service)
 builder.Services.AddHostedService<PlacesSyncService>();
+builder.Services.AddHostedService<PlaceMaintenanceStartupHostedService>();
 builder.Services.AddScoped<IPlacesSyncService, PlacesSyncService>();
 
 // CORS

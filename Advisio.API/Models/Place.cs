@@ -17,6 +17,9 @@ public class Place
     /// <summary>Окончание мероприятия — места с истекшей датой не показываются</summary>
     public DateTime? EventEndDate { get; set; }
 
+    /// <summary>Уникальный id события PredictHQ (<c>id</c> в ответе API) — защита от дубликатов при импорте.</summary>
+    public string? PredictHqEventId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 

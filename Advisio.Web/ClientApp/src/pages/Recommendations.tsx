@@ -5,11 +5,32 @@ import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Heart, Star, Sparkles, MapPin, ExternalLink } from "lucide-react";
-import PlaceCard from "@/components/PlaceCard";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Place } from "@/components/PlaceCard";
+import { useResolvingImageUrl } from "@/hooks/useResolvingImageUrl";
+
+function RecommendationCoverImage({ place }: { place: Place }) {
+  const { effectiveUrl, onImgError } = useResolvingImageUrl(place.imageUrl);
+  if (effectiveUrl) {
+    return (
+      <div className="relative h-48 overflow-hidden">
+        <img
+          src={effectiveUrl}
+          alt={place.name}
+          className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+          onError={onImgError}
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="h-48 bg-muted flex items-center justify-center">
+      <MapPin className="h-12 w-12 text-muted-foreground/50" />
+    </div>
+  );
+}
 
 interface Recommendation {
   place: Place;
@@ -224,20 +245,7 @@ const Recommendations = () => {
                   </div>
                 </CardHeader>
 
-                {/* Image */}
-                {rec.place.imageUrl ? (
-                  <div className="relative h-48 overflow-hidden">
-                    <img
-                      src={rec.place.imageUrl}
-                      alt={rec.place.name}
-                      className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-                    />
-                  </div>
-                ) : (
-                  <div className="h-48 bg-muted flex items-center justify-center">
-                    <MapPin className="h-12 w-12 text-muted-foreground/50" />
-                  </div>
-                )}
+                <RecommendationCoverImage place={rec.place} />
 
                 <CardContent className="flex-1 pt-5">
                   <h3 className="font-display text-xl font-semibold mb-2 text-foreground">

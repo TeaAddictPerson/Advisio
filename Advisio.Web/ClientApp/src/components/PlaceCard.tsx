@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Heart, Star, MapPin, ExternalLink } from "lucide-react"
 import { Link } from "react-router-dom"
 import { cn } from "@/lib/utils"
+import { useResolvingImageUrl } from "@/hooks/useResolvingImageUrl"
 
 export interface Place {
   id: number;
@@ -41,6 +42,7 @@ const PlaceCard = ({
   onEdit,
   className 
 }: PlaceCardProps) => {
+  const { effectiveUrl, onImgError } = useResolvingImageUrl(place.imageUrl)
   const truncatedDescription = place.description.length > 150 
     ? place.description.substring(0, 150) + "..." 
     : place.description
@@ -48,12 +50,13 @@ const PlaceCard = ({
   return (
     <Card variant="place" className={cn("flex flex-col h-full", className)}>
       {/* Image */}
-      {place.imageUrl ? (
+      {effectiveUrl ? (
         <div className="relative h-48 overflow-hidden">
           <img
-            src={place.imageUrl}
+            src={effectiveUrl}
             alt={place.name}
             className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+            onError={onImgError}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-foreground/30 to-transparent" />
         </div>

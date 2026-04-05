@@ -17,8 +17,18 @@ public interface IPlaceService
     Task<List<PlaceDto>> GetLikedPlacesAsync(int userId);
     Task<int> PruneLegacyPredictHqPlaceDuplicatesAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Снимок множеств для дедупликации при импорте PredictHQ (id события и логический ключ названия).</summary>
+    Task<(HashSet<string> PredictHqEventIds, HashSet<string> LogicalNameKeys)> GetPredictHqImportDedupSnapshotAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Все места: разбор «Дата и время: …» и строк Начало/Окончание, заполнение EventStart/End, формат как у импорта.</summary>
+    Task<int> NormalizeAllPlacesEventDescriptionsAndDatesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Удаляет просроченные мероприятия по EventEndDate в БД (после нормализации); если конец в БД пуст — по разбору описания.</summary>
+    Task<int> DeleteExpiredEventPlacesAsync(CancellationToken cancellationToken = default);
+
     Task AssignCategoriesToPlacesWithoutCategoriesAsync();
-    /// <summary>Автоподбор ImageUrl для мест без картинки (лимит за вызов).</summary>
+    /// <summary>Автоподбор ImageUrl для мест без картинки или с ненадёжными URL (PredictHQ CDN и т.п.); лимит за вызов.</summary>
     Task<int> AssignImagesToPlacesWithoutImagesAsync(int maxPlaces, CancellationToken cancellationToken = default);
     Task RecordPlaceViewAsync(int userId, int placeId);
     Task RecordFilterUsageAsync(int userId, string filterType, string filterValue);

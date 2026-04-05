@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import EditPlaceDialog from "@/components/EditPlaceDialog";
 import type { Place } from "@/components/PlaceCard";
+import { useResolvingImageUrl } from "@/hooks/useResolvingImageUrl";
 
 const AddReviewForm = ({ onSubmit, loading }: { onSubmit: (rating: number, comment: string) => void; loading: boolean }) => {
   const [rating, setRating] = useState(0);
@@ -72,6 +73,7 @@ const PlaceDetail = () => {
   const [commentLoading, setCommentLoading] = useState(false);
   const [collections, setCollections] = useState<Array<{ id: number; name: string; places: { id: number }[] }>>([]);
   const [isVisited, setIsVisited] = useState(false);
+  const { effectiveUrl: coverImageUrl, onImgError: onCoverImgError } = useResolvingImageUrl(place?.imageUrl);
 
   useEffect(() => {
     if (id) {
@@ -441,12 +443,13 @@ const PlaceDetail = () => {
 
         <Card variant="elevated" className="overflow-hidden animate-fade-in">
           {/* Image */}
-          {place.imageUrl ? (
+          {coverImageUrl ? (
             <div className="relative h-64 md:h-96 overflow-hidden">
               <img
-                src={place.imageUrl}
+                src={coverImageUrl}
                 alt={place.name}
                 className="w-full h-full object-cover"
+                onError={onCoverImgError}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-foreground/50 to-transparent" />
             </div>

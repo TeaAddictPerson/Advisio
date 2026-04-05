@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
@@ -17,6 +18,18 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+/** При загрузке SPA: подгрузка PredictHQ и очистка просроченных мероприятий (на сервере — интервалы и блокировки). */
+function SiteOpenBackgroundTasks() {
+  useEffect(() => {
+    const opts: RequestInit = { method: "POST", credentials: "include" };
+    void Promise.allSettled([
+      fetch("/api/Places/external-import-on-visit", opts),
+      fetch("/api/Places/expire-cleanup-on-visit", opts),
+    ]);
+  }, []);
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -24,6 +37,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <SiteOpenBackgroundTasks />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/places" element={<Places />} />

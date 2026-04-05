@@ -4513,11 +4513,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\CodingStuff\\Advisio\\Advisio.Web\\Advisio.Web.csproj",
+      "projectUniqueName": "d:\\CodingStuff\\Advisio\\Advisio.Web\\Advisio.Web.csproj",
       "projectName": "Advisio.Web",
-      "projectPath": "D:\\CodingStuff\\Advisio\\Advisio.Web\\Advisio.Web.csproj",
+      "projectPath": "d:\\CodingStuff\\Advisio\\Advisio.Web\\Advisio.Web.csproj",
       "packagesPath": "C:\\Users\\User\\.nuget\\packages\\",
-      "outputPath": "D:\\CodingStuff\\Advisio\\Advisio.Web\\obj\\",
+      "outputPath": "d:\\CodingStuff\\Advisio\\Advisio.Web\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

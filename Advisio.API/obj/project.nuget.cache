@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "H/VwGGplPZE=",
+  "dgSpecHash": "/8bkS0MYf4o=",
   "success": true,
-  "projectFilePath": "d:\\CodingStuff\\Advisio\\Advisio.API\\Advisio.API.csproj",
+  "projectFilePath": "D:\\CodingStuff\\Advisio\\Advisio.API\\Advisio.API.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\User\\.nuget\\packages\\azure.core\\1.25.0\\azure.core.1.25.0.nupkg.sha512",
     "C:\\Users\\User\\.nuget\\packages\\azure.identity\\1.7.0\\azure.identity.1.7.0.nupkg.sha512",

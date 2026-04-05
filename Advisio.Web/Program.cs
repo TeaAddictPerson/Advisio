@@ -19,6 +19,7 @@ builder.Services.AddSwaggerGen();
 
 // Sessions для аутентификации
 builder.Services.AddDistributedMemoryCache();
+builder.Services.AddMemoryCache();
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromMinutes(30);
@@ -49,6 +50,8 @@ builder.Services.AddHttpClient(PredictHqEventsImportService.HttpClientName, clie
     client.Timeout = TimeSpan.FromMinutes(3);
 });
 builder.Services.AddScoped<IPredictHqEventsImportService, PredictHqEventsImportService>();
+builder.Services.AddSingleton<IVisitTriggeredPredictHqImportService, VisitTriggeredPredictHqImportService>();
+builder.Services.AddSingleton<IVisitTriggeredExpiredPlacesCleanupService, VisitTriggeredExpiredPlacesCleanupService>();
 
 // Background Service для синхронизации мест
 var syncEnabled = builder.Configuration.GetValue<bool>("PlacesSync:Enabled", true);
@@ -59,6 +62,7 @@ if (syncEnabled)
 
 builder.Services.AddHostedService<PredictHqStartupImportHostedService>();
 builder.Services.AddHostedService<PredictHqPeriodicImportHostedService>();
+builder.Services.AddHostedService<PlaceMaintenanceStartupHostedService>();
 
 // CORS
 builder.Services.AddCors(options =>

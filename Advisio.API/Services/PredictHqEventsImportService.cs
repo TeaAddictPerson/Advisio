@@ -32,6 +32,13 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
         _logger = logger;
     }
 
+    public bool IsConfiguredForImport()
+    {
+        if (!_configuration.GetValue<bool>("PlacesSync:ExternalImportEnabled", true))
+            return false;
+        return !string.IsNullOrWhiteSpace(ResolvePredictHqToken());
+    }
+
     public async Task<int> ImportEventsAsync(
         bool forceRun = false,
         int? maxPlacesToAdd = null,
@@ -80,6 +87,8 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
         _logger.LogInformation("PredictHQ: за этот запрос создаём до {Max} новых мест (страница до {Page} событий)", maxTotal, pageSize);
 
         var client = _httpClientFactory.CreateClient(HttpClientName);
+        var (existingPhqIds, existingNameKeys) = await _placeService.GetPredictHqImportDedupSnapshotAsync(cancellationToken)
+            .ConfigureAwait(false);
         var added = 0;
         var offset = 0;
 
@@ -145,7 +154,8 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
                     if (added >= maxTotal)
                         break;
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (await TryCreatePlaceFromEventAsync(el, cancellationToken))
+                    if (await TryCreatePlaceFromEventAsync(el, existingPhqIds, existingNameKeys, cancellationToken)
+                            .ConfigureAwait(false))
                         added++;
                 }
 
@@ -212,7 +222,11 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
         File.WriteAllText(statePath, DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
     }
 
-    private async Task<bool> TryCreatePlaceFromEventAsync(JsonElement el, CancellationToken cancellationToken)
+    private async Task<bool> TryCreatePlaceFromEventAsync(
+        JsonElement el,
+        HashSet<string> existingPhqIds,
+        HashSet<string> existingNameKeys,
+        CancellationToken cancellationToken)
     {
         var dto = MapToCreateDto(el);
         if (dto == null || string.IsNullOrWhiteSpace(dto.Name))
@@ -220,14 +234,27 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
 
         dto.Description = PredictHqDescriptionNormalizer.FinalizeImportedDescription(dto.Description ?? string.Empty);
 
+        if (!string.IsNullOrWhiteSpace(dto.PredictHqEventId) && existingPhqIds.Contains(dto.PredictHqEventId))
+            return false;
+
+        var nameKey = PlaceNameSanitizer.LogicalNameKey(dto.Name);
+        if (existingNameKeys.Contains(nameKey))
+            return false;
+
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            await _placeService.CreatePlaceAsync(dto);
+            await _placeService.CreatePlaceAsync(dto).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(dto.PredictHqEventId))
+                existingPhqIds.Add(dto.PredictHqEventId);
+            existingNameKeys.Add(nameKey);
             return true;
         }
         catch (InvalidOperationException)
         {
+            if (!string.IsNullOrWhiteSpace(dto.PredictHqEventId))
+                existingPhqIds.Add(dto.PredictHqEventId);
+            existingNameKeys.Add(nameKey);
             return false;
         }
         catch (Exception ex)
@@ -309,11 +336,14 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
             address = GetStringCandidate(ga, "formatted_address", "name");
 
         var imageUrl = GetStringCandidate(e, "image_url", "image");
+        if (PlaceImageUrlHeuristics.ShouldAutopickInsteadOfImportedUrl(imageUrl))
+            imageUrl = null;
 
         decimal? lat = null, lon = null;
         TryPredictHqGeo(e, ref lat, ref lon, ref address);
 
         TryParseEventDate(e, out var start, out var end);
+        EventWindowNormalizer.NormalizeIfStartEndSameInstant(ref start, ref end);
 
         var venueForText = string.IsNullOrWhiteSpace(address) ? TryExtractVenueName(e) : address;
         var description = BuildPredictHqEventDescription(e, descRaw, start, end, venueForText);
@@ -332,8 +362,19 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
             Type = placeType,
             CategoryIds = new List<int>(),
             EventStartDate = start,
-            EventEndDate = end
+            EventEndDate = end,
+            PredictHqEventId = TryGetPredictHqEventId(e)
         };
+    }
+
+    private static string? TryGetPredictHqEventId(JsonElement e)
+    {
+        if (!TryGetPropertyCi(e, "id", out var idEl) || idEl.ValueKind != JsonValueKind.String)
+            return null;
+        var s = idEl.GetString()?.Trim();
+        if (string.IsNullOrEmpty(s))
+            return null;
+        return s.Length <= 64 ? s : s[..64];
     }
 
     private static string? TryExtractVenueName(JsonElement e)

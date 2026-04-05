@@ -176,29 +176,36 @@ public class PlaceService : IPlaceService
 
     public async Task<PlaceDto> CreatePlaceAsync(CreatePlaceDto createPlaceDto)
     {
-        // Валидация
-        if (string.IsNullOrWhiteSpace(createPlaceDto.Name))
-        {
+        var displayName = PlaceNameSanitizer.ForDisplay((createPlaceDto.Name ?? string.Empty).Trim());
+        if (string.IsNullOrWhiteSpace(displayName))
             throw new ArgumentException("Название места не может быть пустым", nameof(createPlaceDto));
+
+        string? phqEventId = null;
+        if (!string.IsNullOrWhiteSpace(createPlaceDto.PredictHqEventId))
+        {
+            phqEventId = createPlaceDto.PredictHqEventId.Trim();
+            if (phqEventId.Length > 64)
+                phqEventId = phqEventId[..64];
+            var samePhq = await _context.Places.AsNoTracking()
+                .AnyAsync(p => p.PredictHqEventId == phqEventId);
+            if (samePhq)
+                throw new InvalidOperationException($"Событие PredictHQ уже сохранено (id «{phqEventId}»).");
         }
 
-        // Проверяем, не существует ли уже место с таким именем (case-insensitive)
-        var existingPlace = await _context.Places
-            .FirstOrDefaultAsync(p => p.Name != null && p.Name.ToLower() == createPlaceDto.Name.ToLower());
-        
-        if (existingPlace != null)
-        {
-            throw new InvalidOperationException($"Место с названием '{createPlaceDto.Name}' уже существует");
-        }
+        var logicalKey = PlaceNameSanitizer.LogicalNameKey(displayName);
+        if (await PlaceLogicalNameKeyExistsAsync(logicalKey))
+            throw new InvalidOperationException($"Место с названием '{displayName}' уже существует");
 
         var imageUrl = createPlaceDto.ImageUrl?.Trim();
+        if (PlaceImageUrlHeuristics.ShouldAutopickInsteadOfImportedUrl(imageUrl))
+            imageUrl = null;
         if (string.IsNullOrWhiteSpace(imageUrl))
         {
             try
             {
                 var typeForSearch = PlaceTypeFormatter.FormatForDisplay(createPlaceDto.Type);
                 imageUrl = await _placeImageSearch.PickFirstImageUrlAsync(
-                    createPlaceDto.Name.Trim(), typeForSearch, createPlaceDto.Address);
+                    displayName, typeForSearch, createPlaceDto.Address);
             }
             catch
             {
@@ -208,7 +215,7 @@ public class PlaceService : IPlaceService
 
         var place = new Place
         {
-            Name = createPlaceDto.Name.Trim(),
+            Name = displayName,
             Description = createPlaceDto.Description ?? string.Empty,
             Address = createPlaceDto.Address,
             ImageUrl = imageUrl,
@@ -217,8 +224,11 @@ public class PlaceService : IPlaceService
             Type = PlaceTypeFormatter.FormatForDisplay(createPlaceDto.Type),
             EventStartDate = createPlaceDto.EventStartDate,
             EventEndDate = createPlaceDto.EventEndDate,
+            PredictHqEventId = phqEventId,
             CreatedAt = DateTime.UtcNow
         };
+
+        PlaceEventDescriptionNormalizer.ApplyNormalizationToPlace(place, out _);
 
         _context.Places.Add(place);
         await _context.SaveChangesAsync();
@@ -257,6 +267,8 @@ public class PlaceService : IPlaceService
         place.Description = updatePlaceDto.Description ?? string.Empty;
         place.Address = updatePlaceDto.Address;
         place.ImageUrl = updatePlaceDto.ImageUrl?.Trim();
+        if (PlaceImageUrlHeuristics.ShouldAutopickInsteadOfImportedUrl(place.ImageUrl))
+            place.ImageUrl = null;
         place.Latitude = updatePlaceDto.Latitude;
         place.Longitude = updatePlaceDto.Longitude;
         place.Type = PlaceTypeFormatter.FormatForDisplay(updatePlaceDto.Type);
@@ -274,6 +286,7 @@ public class PlaceService : IPlaceService
         }
         place.EventStartDate = updatePlaceDto.EventStartDate;
         place.EventEndDate = updatePlaceDto.EventEndDate;
+        PlaceEventDescriptionNormalizer.ApplyNormalizationToPlace(place, out _);
         place.UpdatedAt = DateTime.UtcNow;
 
         // Обновляем категории
@@ -681,49 +694,137 @@ public class PlaceService : IPlaceService
         if (places.Count == 0)
             return 0;
 
-        var toRemove = new List<Place>();
+        var toRemoveIds = new HashSet<int>();
 
         foreach (var g in places.GroupBy(p => PlaceNameSanitizer.LogicalNameKey(p.Name)))
         {
             var list = g.ToList();
-            if (list.Count >= 2)
+            if (list.Count == 1)
             {
-                var hasGood = list.Any(p =>
-                    !PredictHqDescriptionNormalizer.LooksLikeRawPredictHqImportDescription(p.Description));
-                if (hasGood)
-                {
-                    foreach (var p in list.Where(x =>
-                                 PredictHqDescriptionNormalizer.LooksLikeRawPredictHqImportDescription(x.Description)))
-                        toRemove.Add(p);
-                    continue;
-                }
-
-                if (list.TrueForAll(p =>
-                        PredictHqDescriptionNormalizer.LooksLikeRawPredictHqImportDescription(p.Description)))
-                {
-                    var keeper = list
-                        .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
-                        .ThenByDescending(p => p.Id)
-                        .First();
-                    foreach (var p in list.Where(x => x.Id != keeper.Id))
-                        toRemove.Add(p);
-                }
-
+                if (PredictHqDescriptionNormalizer.LooksLikeRawPredictHqImportDescription(list[0].Description))
+                    toRemoveIds.Add(list[0].Id);
                 continue;
             }
 
-            var only = list[0];
-            if (PredictHqDescriptionNormalizer.LooksLikeRawPredictHqImportDescription(only.Description))
-                toRemove.Add(only);
+            var hasGood = list.Any(p =>
+                !PredictHqDescriptionNormalizer.LooksLikeRawPredictHqImportDescription(p.Description));
+
+            Place keeper;
+            if (hasGood)
+            {
+                var good = list.Where(p => !PredictHqDescriptionNormalizer.LooksLikeRawPredictHqImportDescription(p.Description))
+                    .ToList();
+                keeper = good.OrderByDescending(p => !string.IsNullOrEmpty(p.PredictHqEventId))
+                    .ThenByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+                    .ThenByDescending(p => p.Id)
+                    .First();
+            }
+            else
+            {
+                keeper = list
+                    .OrderByDescending(p => !string.IsNullOrEmpty(p.PredictHqEventId))
+                    .ThenByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+                    .ThenByDescending(p => p.Id)
+                    .First();
+            }
+
+            foreach (var p in list.Where(x => x.Id != keeper.Id))
+                toRemoveIds.Add(p.Id);
         }
 
-        var unique = toRemove.DistinctBy(p => p.Id).ToList();
+        var unique = places.Where(p => toRemoveIds.Contains(p.Id)).ToList();
         if (unique.Count == 0)
             return 0;
 
         _context.Places.RemoveRange(unique);
         await _context.SaveChangesAsync(cancellationToken);
         return unique.Count;
+    }
+
+    public async Task<(HashSet<string> PredictHqEventIds, HashSet<string> LogicalNameKeys)> GetPredictHqImportDedupSnapshotAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await _context.Places.AsNoTracking()
+            .Select(p => new { p.Name, p.PredictHqEventId })
+            .ToListAsync(cancellationToken);
+
+        var phq = new HashSet<string>(StringComparer.Ordinal);
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var r in rows)
+        {
+            if (!string.IsNullOrWhiteSpace(r.PredictHqEventId))
+                phq.Add(r.PredictHqEventId.Trim());
+            if (!string.IsNullOrWhiteSpace(r.Name))
+                keys.Add(PlaceNameSanitizer.LogicalNameKey(r.Name));
+        }
+
+        return (phq, keys);
+    }
+
+    private async Task<bool> PlaceLogicalNameKeyExistsAsync(string logicalKey, CancellationToken cancellationToken = default)
+    {
+        var names = await _context.Places.AsNoTracking()
+            .Where(p => p.Name != null)
+            .Select(p => p.Name!)
+            .ToListAsync(cancellationToken);
+        return names.Any(n => PlaceNameSanitizer.LogicalNameKey(n) == logicalKey);
+    }
+
+    public async Task<int> NormalizeAllPlacesEventDescriptionsAndDatesAsync(CancellationToken cancellationToken = default)
+    {
+        var places = await _context.Places.ToListAsync(cancellationToken);
+        if (places.Count == 0)
+            return 0;
+
+        var updated = 0;
+        foreach (var p in places)
+        {
+            if (PlaceEventDescriptionNormalizer.ApplyNormalizationToPlace(p, out var changed) && changed)
+                updated++;
+        }
+
+        if (updated > 0)
+            await _context.SaveChangesAsync(cancellationToken);
+
+        return updated;
+    }
+
+    public async Task<int> DeleteExpiredEventPlacesAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+
+        // После NormalizeAllPlaces... опираемся на EventEndDate в БД; описание — только если конец так и не записан.
+        var fromDb = await _context.Places
+            .Where(p => p.EventEndDate != null && p.EventEndDate < now)
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+
+        var nullEndRows = await _context.Places
+            .Where(p => p.EventEndDate == null)
+            .Select(p => new { p.Id, p.Description })
+            .ToListAsync(cancellationToken);
+
+        var fromDescription = nullEndRows
+            .Where(x => PlaceEventDescriptionNormalizer.GetParsedEventEndFromDescription(x.Description) is { } e && e < now)
+            .Select(x => x.Id);
+
+        var ids = fromDb.Concat(fromDescription).Distinct().ToList();
+
+        if (ids.Count == 0)
+            return 0;
+
+        await _context.PlaceCategories.Where(pc => ids.Contains(pc.PlaceId)).ExecuteDeleteAsync(cancellationToken);
+        await _context.Favorites.Where(f => ids.Contains(f.PlaceId)).ExecuteDeleteAsync(cancellationToken);
+        await _context.Likes.Where(l => ids.Contains(l.PlaceId)).ExecuteDeleteAsync(cancellationToken);
+        await _context.Recommendations.Where(r => ids.Contains(r.PlaceId)).ExecuteDeleteAsync(cancellationToken);
+        await _context.PlaceCollectionItems.Where(i => ids.Contains(i.PlaceId)).ExecuteDeleteAsync(cancellationToken);
+        await _context.PlaceViews.Where(v => ids.Contains(v.PlaceId)).ExecuteDeleteAsync(cancellationToken);
+        await _context.PlaceReviews.Where(r => ids.Contains(r.PlaceId)).ExecuteDeleteAsync(cancellationToken);
+        await _context.PlaceSubscriptions.Where(s => ids.Contains(s.PlaceId)).ExecuteDeleteAsync(cancellationToken);
+        await _context.PlaceVisits.Where(v => ids.Contains(v.PlaceId)).ExecuteDeleteAsync(cancellationToken);
+        await _context.PlaceComments.Where(c => ids.Contains(c.PlaceId)).ExecuteDeleteAsync(cancellationToken);
+
+        return await _context.Places.Where(p => ids.Contains(p.Id)).ExecuteDeleteAsync(cancellationToken);
     }
 
     public async Task AssignCategoriesToPlacesWithoutCategoriesAsync()
@@ -844,8 +945,17 @@ public class PlaceService : IPlaceService
         if (maxPlaces <= 0)
             return 0;
 
+        // StartsWith(..., OrdinalIgnoreCase) не транслируется в SQL у EF Core — используем Like ( collation БД, обычно CI ).
         var places = await _context.Places
-            .Where(p => string.IsNullOrWhiteSpace(p.ImageUrl))
+            .Where(p =>
+                p.ImageUrl == null
+                || p.ImageUrl == string.Empty
+                || (p.ImageUrl != null
+                    && !EF.Functions.Like(p.ImageUrl, "http://%")
+                    && !EF.Functions.Like(p.ImageUrl, "https://%"))
+                || (p.ImageUrl != null && EF.Functions.Like(p.ImageUrl, "%predicthq%"))
+                || (p.ImageUrl != null && EF.Functions.Like(p.ImageUrl, "%phq.imgix%"))
+                || (p.ImageUrl != null && EF.Functions.Like(p.ImageUrl, "%phq.io%")))
             .OrderBy(p => p.Id)
             .Take(maxPlaces)
             .ToListAsync(cancellationToken);
@@ -854,6 +964,9 @@ public class PlaceService : IPlaceService
         foreach (var place in places)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!PlaceImageUrlHeuristics.ShouldAutopickInsteadOfImportedUrl(place.ImageUrl))
+                continue;
+
             string? url;
             try
             {

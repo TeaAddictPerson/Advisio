@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "d:\\CodingStuff\\Advisio\\Advisio.API\\Advisio.API.csproj": {}
+    "D:\\CodingStuff\\Advisio\\Advisio.API\\Advisio.API.csproj": {}
   },
   "projects": {
-    "d:\\CodingStuff\\Advisio\\Advisio.API\\Advisio.API.csproj": {
+    "D:\\CodingStuff\\Advisio\\Advisio.API\\Advisio.API.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\CodingStuff\\Advisio\\Advisio.API\\Advisio.API.csproj",
+        "projectUniqueName": "D:\\CodingStuff\\Advisio\\Advisio.API\\Advisio.API.csproj",
         "projectName": "Advisio.API",
-        "projectPath": "d:\\CodingStuff\\Advisio\\Advisio.API\\Advisio.API.csproj",
+        "projectPath": "D:\\CodingStuff\\Advisio\\Advisio.API\\Advisio.API.csproj",
         "packagesPath": "C:\\Users\\User\\.nuget\\packages\\",
-        "outputPath": "d:\\CodingStuff\\Advisio\\Advisio.API\\obj\\",
+        "outputPath": "D:\\CodingStuff\\Advisio\\Advisio.API\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

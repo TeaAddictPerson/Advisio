@@ -9,10 +9,33 @@ namespace Advisio.Web.Controllers;
 public class PlacesController : ControllerBase
 {
     private readonly IPlaceService _placeService;
+    private readonly IVisitTriggeredPredictHqImportService _visitPredictHqImport;
+    private readonly IVisitTriggeredExpiredPlacesCleanupService _visitExpireCleanup;
 
-    public PlacesController(IPlaceService placeService)
+    public PlacesController(
+        IPlaceService placeService,
+        IVisitTriggeredPredictHqImportService visitPredictHqImport,
+        IVisitTriggeredExpiredPlacesCleanupService visitExpireCleanup)
     {
         _placeService = placeService;
+        _visitPredictHqImport = visitPredictHqImport;
+        _visitExpireCleanup = visitExpireCleanup;
+    }
+
+    /// <summary>Фоновая подгрузка новых мест из PredictHQ при открытии сайта (дубликаты по названию не создаются).</summary>
+    [HttpPost("external-import-on-visit")]
+    public async Task<ActionResult<VisitTriggeredImportResult>> ExternalImportOnVisit(CancellationToken cancellationToken)
+    {
+        var result = await _visitPredictHqImport.TryPullNewPlacesOnSiteVisitAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Фоновое удаление просроченных мероприятий при открытии сайта (интервал как у подгрузки PredictHQ).</summary>
+    [HttpPost("expire-cleanup-on-visit")]
+    public async Task<ActionResult<VisitTriggeredExpireCleanupResult>> ExpireCleanupOnVisit(CancellationToken cancellationToken)
+    {
+        var result = await _visitExpireCleanup.TryRemoveExpiredPlacesOnSiteVisitAsync(cancellationToken);
+        return Ok(result);
     }
 
     [HttpGet]
