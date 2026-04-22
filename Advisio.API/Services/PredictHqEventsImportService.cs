@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Advisio.API.DTOs;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -257,11 +259,31 @@ public class PredictHqEventsImportService : IPredictHqEventsImportService
             existingNameKeys.Add(nameKey);
             return false;
         }
+        catch (DbUpdateException ex) when (IsPredictHqDuplicateKeyViolation(ex))
+        {
+            // Параллельный импорт успел вставить то же событие чуть раньше.
+            if (!string.IsNullOrWhiteSpace(dto.PredictHqEventId))
+                existingPhqIds.Add(dto.PredictHqEventId);
+            existingNameKeys.Add(nameKey);
+            return false;
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "PredictHQ: пропуск «{Name}»", dto.Name);
             return false;
         }
+    }
+
+    private static bool IsPredictHqDuplicateKeyViolation(DbUpdateException ex)
+    {
+        if (ex.InnerException is not SqlException sqlEx)
+            return false;
+
+        var isDuplicate = sqlEx.Number is 2601 or 2627;
+        if (!isDuplicate)
+            return false;
+
+        return sqlEx.Message.Contains("IX_Places_PredictHqEventId", StringComparison.OrdinalIgnoreCase);
     }
 
     private static List<JsonElement> ExtractEventItemsFromRoot(JsonElement root)
