@@ -137,9 +137,10 @@ public static class PlaceTypeFormatter
         var canonical = FormatForDisplay(trimmed);
         AddLower(canonical);
         AddLower(trimmed);
-        AddLower(DefaultCanonicalType);
-        AddLower("Мероприятие");
-        AddLower("мероприятие");
+
+        var isKnownCanonical = CanonicalTypes.Any(c => string.Equals(c, canonical, StringComparison.Ordinal));
+        if (!isKnownCanonical)
+            return set.ToList();
 
         foreach (var kv in SlugToRussian)
         {
