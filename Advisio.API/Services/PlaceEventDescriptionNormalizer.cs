@@ -45,6 +45,7 @@ public static class PlaceEventDescriptionNormalizer
 
     private static readonly Regex RuStartLine = new(@"^\s*Начало:\s*(.+)\s*$", RegexOptions.IgnoreCase, RxTimeout);
     private static readonly Regex RuEndLine = new(@"^\s*Окончание:\s*(.+)\s*$", RegexOptions.IgnoreCase, RxTimeout);
+    private static readonly Regex RuLocationLine = new(@"^\s*Место\s+проведения:\s*(.+)\s*$", RegexOptions.IgnoreCase, RxTimeout);
     private static readonly Regex EnStartLine = new(@"^\s*Start(?:ed|ing|s)?\s*[:\-]\s*(.+)\s*$", RegexOptions.IgnoreCase, RxTimeout);
     private static readonly Regex EnEndLine = new(@"^\s*End(?:ing|s)?(?:\s+date)?\s*[:\-]\s*(.+)\s*$", RegexOptions.IgnoreCase, RxTimeout);
 
@@ -106,6 +107,8 @@ public static class PlaceEventDescriptionNormalizer
                 sb.AppendLine(bl.TrimEnd());
         }
 
+        if (!string.IsNullOrWhiteSpace(place.Address))
+            sb.AppendLine($"Место проведения: {place.Address.Trim()}");
         if (s.HasValue)
             sb.AppendLine($"Начало: {s.Value.ToString("dd MMMM yyyy, HH:mm", Ru)}");
         if (e.HasValue)
@@ -324,7 +327,7 @@ public static class PlaceEventDescriptionNormalizer
                 continue;
 
             t = cleaned.Trim();
-            if (RuStartLine.IsMatch(t) || RuEndLine.IsMatch(t) || EnStartLine.IsMatch(t) || EnEndLine.IsMatch(t))
+            if (RuLocationLine.IsMatch(t) || RuStartLine.IsMatch(t) || RuEndLine.IsMatch(t) || EnStartLine.IsMatch(t) || EnEndLine.IsMatch(t))
                 continue;
 
             body.Add(cleaned);

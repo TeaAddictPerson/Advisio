@@ -24,6 +24,9 @@ public interface IPlaceService
     /// <summary>Все места: разбор «Дата и время: …» и строк Начало/Окончание, заполнение EventStart/End, формат как у импорта.</summary>
     Task<int> NormalizeAllPlacesEventDescriptionsAndDatesAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Присваивает базовые категории (семья/дети/друзья/активный/спокойный/природа) всем местам, где они подходят.</summary>
+    Task<int> EnsureDefaultCategoriesForAllPlacesAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Удаляет просроченные мероприятия по EventEndDate в БД (после нормализации); если конец в БД пуст — по разбору описания.</summary>
     Task<int> DeleteExpiredEventPlacesAsync(CancellationToken cancellationToken = default);
 

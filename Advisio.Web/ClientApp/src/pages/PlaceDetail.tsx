@@ -534,7 +534,7 @@ const PlaceDetail = () => {
                     <h3 className="font-semibold text-foreground mb-1">На карте</h3>
                     <Button variant="outline" size="sm" onClick={openMap}>
                       <ExternalLink className="h-3.5 w-3.5 mr-2" />
-                      Открыть на карте (поиск по названию)
+                      Открыть на карте
                     </Button>
                   </div>
                 </div>

@@ -251,6 +251,8 @@ public class PlaceService : IPlaceService
             await _context.SaveChangesAsync();
         }
 
+        await EnsureDefaultCategoriesForPlaceAsync(place);
+
         return await GetPlaceByIdAsync(place.Id) ?? throw new Exception("Место не найдено после создания");
     }
 
@@ -843,71 +845,11 @@ public class PlaceService : IPlaceService
         // Получаем все категории
         var categories = await _context.Categories.ToListAsync();
 
-        // Находим категории по ключевым словам
-        var activeCategory = categories.FirstOrDefault(c => 
-            c.Name.Contains("Активный отдых", StringComparison.OrdinalIgnoreCase));
-        var calmCategory = categories.FirstOrDefault(c => 
-            c.Name.Contains("Спокойный отдых", StringComparison.OrdinalIgnoreCase));
-        var natureCategory = categories.FirstOrDefault(c => 
-            c.Name.Contains("На природе", StringComparison.OrdinalIgnoreCase));
-        var friendsCategory = categories.FirstOrDefault(c => 
-            c.Name.Contains("С друзьями", StringComparison.OrdinalIgnoreCase));
-        var familyCategory = categories.FirstOrDefault(c => 
-            c.Name.Contains("С семьей", StringComparison.OrdinalIgnoreCase));
-        var childCategory = categories.FirstOrDefault(c => 
-            c.Name.Contains("С ребенком", StringComparison.OrdinalIgnoreCase));
-
         int assignedCount = 0;
 
         foreach (var place in placesWithoutCategories)
         {
-            var categoryIds = new List<int>();
-            var text = ((place.Name ?? "") + " " + (place.Description ?? "")).ToLower();
-
-            // Определяем категории на основе текста
-            if (activeCategory != null && 
-                (text.Contains("спорт") || text.Contains("фитнес") || text.Contains("актив") || 
-                 text.Contains("тренировк") || text.Contains("заняти")))
-            {
-                categoryIds.Add(activeCategory.Id);
-            }
-
-            if (calmCategory != null && 
-                (text.Contains("музей") || text.Contains("театр") || text.Contains("выставка") || 
-                 text.Contains("кино") || text.Contains("концерт") || text.Contains("галерея")))
-            {
-                categoryIds.Add(calmCategory.Id);
-            }
-
-            if (natureCategory != null && 
-                (text.Contains("парк") || text.Contains("природа") || text.Contains("лес") || 
-                 text.Contains("озеро") || text.Contains("река") || text.Contains("пляж")))
-            {
-                categoryIds.Add(natureCategory.Id);
-            }
-
-            // Определяем категорию по типу компании
-            if (familyCategory != null && 
-                (text.Contains("семья") || text.Contains("семейн")))
-            {
-                categoryIds.Add(familyCategory.Id);
-            }
-            else if (childCategory != null && 
-                     (text.Contains("дет") || text.Contains("ребенок") || text.Contains("малыш")))
-            {
-                categoryIds.Add(childCategory.Id);
-            }
-            else if (friendsCategory != null)
-            {
-                // По умолчанию - с друзьями
-                categoryIds.Add(friendsCategory.Id);
-            }
-
-            // Если не определили ни одной категории, добавляем "С друзьями" по умолчанию
-            if (!categoryIds.Any() && friendsCategory != null)
-            {
-                categoryIds.Add(friendsCategory.Id);
-            }
+            var categoryIds = ResolveCategoryIdsForPlace(place, categories);
 
             // Получаем существующие категории для этого места
             var existingCategoryIds = await _context.PlaceCategories
@@ -938,6 +880,135 @@ public class PlaceService : IPlaceService
         {
             throw new Exception($"Ошибка при присвоении категорий местам: {ex.Message}", ex);
         }
+    }
+
+    public async Task<int> EnsureDefaultCategoriesForAllPlacesAsync(CancellationToken cancellationToken = default)
+    {
+        var categories = await _context.Categories.ToListAsync(cancellationToken);
+        if (categories.Count == 0)
+            return 0;
+
+        var places = await _context.Places
+            .OrderBy(p => p.Id)
+            .ToListAsync(cancellationToken);
+        if (places.Count == 0)
+            return 0;
+
+        var placeIds = places.Select(p => p.Id).ToList();
+        var existing = await _context.PlaceCategories
+            .Where(pc => placeIds.Contains(pc.PlaceId))
+            .Select(pc => new { pc.PlaceId, pc.CategoryId })
+            .ToListAsync(cancellationToken);
+
+        var existingMap = existing
+            .GroupBy(x => x.PlaceId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.CategoryId).ToHashSet());
+
+        var added = 0;
+        foreach (var place in places)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!existingMap.TryGetValue(place.Id, out var current))
+            {
+                current = new HashSet<int>();
+                existingMap[place.Id] = current;
+            }
+
+            var desired = ResolveCategoryIdsForPlace(place, categories);
+            foreach (var categoryId in desired)
+            {
+                if (current.Contains(categoryId))
+                    continue;
+                _context.PlaceCategories.Add(new PlaceCategory
+                {
+                    PlaceId = place.Id,
+                    CategoryId = categoryId
+                });
+                current.Add(categoryId);
+                added++;
+            }
+        }
+
+        if (added > 0)
+            await _context.SaveChangesAsync(cancellationToken);
+        return added;
+    }
+
+    private async Task EnsureDefaultCategoriesForPlaceAsync(Place place)
+    {
+        var categories = await _context.Categories.ToListAsync();
+        var categoryIds = ResolveCategoryIdsForPlace(place, categories);
+        if (categoryIds.Count == 0)
+            return;
+
+        var existing = await _context.PlaceCategories
+            .Where(pc => pc.PlaceId == place.Id)
+            .Select(pc => pc.CategoryId)
+            .ToListAsync();
+
+        var toAdd = categoryIds.Where(id => !existing.Contains(id)).ToList();
+        if (toAdd.Count == 0)
+            return;
+
+        foreach (var categoryId in toAdd)
+        {
+            _context.PlaceCategories.Add(new PlaceCategory
+            {
+                PlaceId = place.Id,
+                CategoryId = categoryId
+            });
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    private static List<int> ResolveCategoryIdsForPlace(Place place, List<Category> categories)
+    {
+        var activeCategory = categories.FirstOrDefault(c =>
+            c.Name.Contains("Активный отдых", StringComparison.OrdinalIgnoreCase));
+        var calmCategory = categories.FirstOrDefault(c =>
+            c.Name.Contains("Спокойный отдых", StringComparison.OrdinalIgnoreCase));
+        var natureCategory = categories.FirstOrDefault(c =>
+            c.Name.Contains("На природе", StringComparison.OrdinalIgnoreCase));
+        var friendsCategory = categories.FirstOrDefault(c =>
+            c.Name.Contains("С друзьями", StringComparison.OrdinalIgnoreCase));
+        var familyCategory = categories.FirstOrDefault(c =>
+            c.Name.Contains("С семьей", StringComparison.OrdinalIgnoreCase));
+        var childCategory = categories.FirstOrDefault(c =>
+            c.Name.Contains("С ребенком", StringComparison.OrdinalIgnoreCase)
+            || c.Name.Contains("С детьми", StringComparison.OrdinalIgnoreCase));
+
+        var categoryIds = new List<int>();
+        var text = ((place.Name ?? "") + " " + (place.Description ?? "") + " " + (place.Type ?? "")).ToLowerInvariant();
+
+        if (activeCategory != null
+            && (text.Contains("спорт") || text.Contains("фитнес") || text.Contains("актив")
+                || text.Contains("тренировк") || text.Contains("заняти") || text.Contains("турнир")))
+            categoryIds.Add(activeCategory.Id);
+
+        if (calmCategory != null
+            && (text.Contains("музей") || text.Contains("театр") || text.Contains("выставка")
+                || text.Contains("кино") || text.Contains("концерт") || text.Contains("галерея")
+                || text.Contains("спектакль")))
+            categoryIds.Add(calmCategory.Id);
+
+        if (natureCategory != null
+            && (text.Contains("парк") || text.Contains("природа") || text.Contains("лес")
+                || text.Contains("озеро") || text.Contains("река") || text.Contains("пляж")
+                || text.Contains("эко") || text.Contains("тропа")))
+            categoryIds.Add(natureCategory.Id);
+
+        if (familyCategory != null && (text.Contains("семья") || text.Contains("семейн")))
+            categoryIds.Add(familyCategory.Id);
+
+        if (childCategory != null && (text.Contains("дет") || text.Contains("ребенок") || text.Contains("малыш")))
+            categoryIds.Add(childCategory.Id);
+
+        if (friendsCategory != null)
+            categoryIds.Add(friendsCategory.Id);
+
+        return categoryIds.Distinct().ToList();
     }
 
     public async Task<int> AssignImagesToPlacesWithoutImagesAsync(int maxPlaces, CancellationToken cancellationToken = default)

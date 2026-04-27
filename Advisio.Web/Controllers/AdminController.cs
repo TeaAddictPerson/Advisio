@@ -36,6 +36,26 @@ public class AdminController : ControllerBase
         }
     }
 
+    [HttpPost("normalize-and-assign-categories")]
+    public async Task<ActionResult> NormalizeAndAssignCategories(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var normalized = await _placeService.NormalizeAllPlacesEventDescriptionsAndDatesAsync(cancellationToken);
+            var assigned = await _placeService.EnsureDefaultCategoriesForAllPlacesAsync(cancellationToken);
+            return Ok(new
+            {
+                message = "Нормализация и присвоение базовых категорий завершены",
+                normalized,
+                assigned
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = $"Ошибка нормализации/категоризации: {ex.Message}" });
+        }
+    }
+
     /// <summary>
     /// Автоподбор URL картинок для мест с пустым ImageUrl. Идёт пакетами, пока есть места без фото.
     /// </summary>
