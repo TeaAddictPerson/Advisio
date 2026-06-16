@@ -104,7 +104,6 @@ public class AuthService : IAuthService
             };
         }
 
-        // Ensure admin@gmail.com always has Admin role
         if (emailNorm == "admin@gmail.com" && user.Role != UserRole.Admin)
         {
             user.Role = UserRole.Admin;

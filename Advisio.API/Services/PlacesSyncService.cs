@@ -29,23 +29,23 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
         var intervalHours = _configuration.GetValue<double>("PlacesSync:IntervalHours", 0.25);
         _syncInterval = TimeSpan.FromHours(intervalHours);
         
-        _logger.LogInformation("⚙️ Настройки синхронизации: Интервал = {Interval} часов, Максимум мест = {MaxPlaces}", 
+        _logger.LogInformation("Настройки синхронизации: интервал = {Interval} ч., максимум мест = {MaxPlaces}", 
             intervalHours, _configuration.GetValue<int>("PlacesSync:MaxPlacesPerSync", 2000));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("🚀 Сервис синхронизации мест запущен. Интервал: {Interval}", _syncInterval);
+        _logger.LogInformation("Сервис синхронизации мест запущен. Интервал: {Interval}", _syncInterval);
 
         try
         {
-            _logger.LogInformation("🔄 Запуск первоначальной синхронизации мест...");
+            _logger.LogInformation("Запуск первоначальной синхронизации мест...");
             await SyncPlacesAsync();
-            _logger.LogInformation("✅ Первоначальная синхронизация завершена успешно");
+            _logger.LogInformation("Первоначальная синхронизация завершена успешно");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ Ошибка при первоначальной синхронизации");
+            _logger.LogError(ex, "Ошибка при первоначальной синхронизации");
         }
 
         await Task.Delay(_syncInterval, stoppingToken);
@@ -54,16 +54,16 @@ public class PlacesSyncService : BackgroundService, IPlacesSyncService
         {
             try
             {
-                _logger.LogInformation("🔄 НАЧАЛО СИНХРОНИЗАЦИИ в {Time}", DateTime.Now);
+                _logger.LogInformation("Начало синхронизации в {Time}", DateTime.Now);
                 await SyncPlacesAsync();
-                _logger.LogInformation("✅ СИНХРОНИЗАЦИЯ ЗАВЕРШЕНА в {Time}", DateTime.Now);
+                _logger.LogInformation("Синхронизация завершена в {Time}", DateTime.Now);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ ОШИБКА СИНХРОНИЗАЦИИ в {Time}: {Error}", DateTime.Now, ex.Message);
+                _logger.LogError(ex, "Ошибка синхронизации в {Time}: {Error}", DateTime.Now, ex.Message);
             }
 
-            _logger.LogInformation("⏳ Ожидание {Interval} до следующей синхронизации...", _syncInterval);
+            _logger.LogInformation("Ожидание {Interval} до следующей синхронизации...", _syncInterval);
             await Task.Delay(_syncInterval, stoppingToken);
         }
     }

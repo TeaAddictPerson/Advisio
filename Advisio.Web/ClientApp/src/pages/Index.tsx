@@ -11,7 +11,7 @@ const Index = () => {
         <div className="container">
           <div className="text-center max-w-3xl mx-auto animate-fade-in">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-foreground mb-6 leading-tight">
-              <span className="text-primary">Advisio</span> — Система рекомендаций мест отдыха
+              <span className="text-primary">Advisio</span> - система рекомендаций мест отдыха
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground font-body leading-relaxed">
               Найдите идеальное место для отдыха с друзьями, семьей или детьми. 

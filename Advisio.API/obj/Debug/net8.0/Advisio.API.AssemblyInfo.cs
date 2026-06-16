@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Advisio.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b747f4b4e661915c1e7897477a6d259252d6cb00")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+22780e99eb8b32a4a053eca9c0158ec842bba791")]
 [assembly: System.Reflection.AssemblyProductAttribute("Advisio.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Advisio.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

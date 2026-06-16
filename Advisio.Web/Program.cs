@@ -42,8 +42,6 @@ builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 builder.Services.AddScoped<ISurveyService, SurveyService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IExternalPlaceService, ExternalPlaceService>();
-builder.Services.AddHttpClient<IExternalPlaceService, ExternalPlaceService>();
 
 builder.Services.AddHttpClient(PredictHqEventsImportService.HttpClientName, client =>
 {

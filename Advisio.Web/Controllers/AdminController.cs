@@ -157,22 +157,6 @@ public class AdminController : ControllerBase
         }
     }
 
-    // Отключена загрузка из Kufar
-    // [HttpPost("load-kufar")]
-    // public async Task<ActionResult> LoadKufarPlaces()
-    // {
-    //     try
-    //     {
-    //         await _kufarService.LoadPlacesFromKufarAsync();
-    //         return Ok(new { message = "Места из Kufar.by успешно загружены" });
-    //     }
-    //     catch (Exception ex)
-    //     {
-    //         return StatusCode(500, new { error = $"Ошибка при загрузке мест из Kufar: {ex.Message}" });
-    //     }
-    // }
-
-
     [HttpPost("clear-places-keep-first-7")]
     public async Task<ActionResult> ClearPlacesKeepFirst7()
     {
